@@ -3,8 +3,8 @@
 This file orients Claude Code (and any AI assistant) working in this repository.
 Read it before making changes. Keep it up to date as the project evolves.
 
-> **Status: Phase 0 done; Phases 1-2 done; Phase 3 IFU backend done (slit/grism
-> and moment-map extraction still open); Phase 6 io-layer started early.**
+> **Status: Phase 0 done; Phases 1-3 done; Phase 6 io-layer and one
+> `kino.analysis` module started early.**
 > `pyproject.toml` and the `kino/` package skeleton exist and `pip install
 > -e ".[dev]"` / `ruff` / `pytest` work. Repo is git-initialised with an MIT
 > `LICENSE`, GitHub Actions CI (lint + test matrix), `pre-commit` config,
@@ -15,16 +15,23 @@ Read it before making changes. Keep it up to date as the project evolves.
 > shear matrix + Mobius ellipticity composition + `magnification` in
 > `kino.lensing.shear`, and a flux-moment shape measurement in
 > `kino.lensing.moments`), `kino.instruments`
-> (Phase 3: `Instrument` base API, `PSF`/`LSF`/`Throughput`/`Detector` in
-> `kino.instruments.base`, and `kino.instruments.ifu.IFU` -- spaxel-grid
+> (Phase 3: `Instrument` base API, `PSF`/`LSF`/`Throughput`/`Detector` and the
+> shared rendering helpers (`gaussian_channel_fractions`,
+> `photon_flux_to_electrons`, `apply_shot_and_read_noise`) in
+> `kino.instruments.base`; `kino.instruments.ifu.IFU` -- spaxel-grid
 > rendering, GalSim optical+atmospheric PSF, Gaussian LSF, and a
-> photon/sky/dark/read noise model, config-loadable via `IFU.from_config` and
-> `kino/config/gmtifs.yaml`), and `kino.io`
+> photon/sky/dark/read noise model; `kino.instruments.slit.SlitSpectrograph`
+> -- slit geometry/losses/misalignment and a companion broadband image,
+> reusing the same PSF/LSF/noise machinery; both config-loadable via
+> `IFU.from_config`/`SlitSpectrograph.from_config` and
+> `kino/config/gmtifs.yaml`/`kino/config/gmacs.yaml`), `kino.io`
 > (`Datacube` + KinMS generator, ahead of the rest of Phase 6 per
-> `TEST_DATA.md`) are implemented and tested. The slit/grism backend, moment-map
-> extraction from an IFU cube, and Phases 4-5 (mocks/inference) have not
-> started, so `examples/`, `notebooks/04_one_galaxy_inference.ipynb`, and
-> `kino/analysis/` are still placeholders that raise `NotImplementedError`.
+> `TEST_DATA.md`), and `kino.analysis.moments` (flux/Vlos/dispersion moment
+> maps with delta-method error propagation from any `Datacube`, also ahead of
+> the rest of Phase 6) are implemented and tested. Phases 4-5
+> (mocks/inference) have not started, so `examples/`,
+> `notebooks/04_one_galaxy_inference.ipynb`, and the rest of `kino/analysis/`
+> are still placeholders that raise `NotImplementedError`.
 
 ## What KINO is
 
@@ -115,7 +122,34 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   (`IFU.sky_electron_rate`) is specified **already as a detected electron rate
   per spaxel** (as from an observatory's own exposure-time calculator), not a
   sky surface brightness — it does not go through the source's
-  throughput/aperture pipeline.
+  throughput/aperture pipeline. `SlitSpectrograph.observe` follows the same
+  three conventions (electrons, sky as a per-along-slit-pixel rate,
+  `rng=None` -> noiseless); see the next bullet for what's specific to it.
+- **Slit geometry and losses:** `SlitSpectrograph`'s slit is a rectangle on
+  sky — length `n_spatial * pixel_scale` along `slit_pa` (degrees East of
+  North, same sense as `DiscGalaxy.pa`), width `slit_width`, centred at
+  `slit_offset` from the scene's own origin. Losses (a source wider than the
+  slit, or a misaligned `slit_pa`/`slit_offset`) are **not** a separate
+  parameter — they fall directly out of rendering on a grid padded by
+  `margin` native pixels beyond the slit's own footprint (so PSF-blurred
+  flux can still cross the boundary) and then truncating to the true
+  aperture at the oversampled (fine) pixel scale. The companion broadband
+  image is the same rendering *without* that truncation or the wavelength
+  split — see `kino/instruments/slit.py`'s module docstring for why it
+  reuses the spectrum's own `line_flux`-normalised profile rather than a
+  separately-calibrated continuum (kino has no continuum-flux input yet).
+- **Moment-map extraction (`kino.analysis.moments`):** generic over any
+  `Datacube`, not instrument-specific. Subtracts a per-spaxel background
+  (median across the spectral axis) before computing flux-weighted
+  moments by default (`subtract_background=True`) — turn it off for an
+  already-background-subtracted cube. Per-voxel `variance` (if present)
+  propagates to `flux`/`vlos`/`dispersion` uncertainties via the standard
+  delta-method (first-order) approximation for a ratio of correlated sums;
+  spaxels below `snr_threshold` have `vlos`/`dispersion` (not `flux`)
+  masked to NaN. `lsf_sigma` (velocity units) optionally removes
+  instrumental broadening from `dispersion` in quadrature — pass it
+  yourself; the function has no notion of which instrument produced the
+  cube.
 
 ## Repository layout (target)
 

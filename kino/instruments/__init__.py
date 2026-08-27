@@ -7,6 +7,7 @@ throughput, and noise handling.
 
 from kino.instruments.base import LSF, PSF, Detector, Instrument, Throughput, photon_energy
 from kino.instruments.ifu import IFU
+from kino.instruments.slit import SlitObservation, SlitSpectrograph
 
 __all__ = [
     "Detector",
@@ -14,6 +15,8 @@ __all__ = [
     "Instrument",
     "LSF",
     "PSF",
+    "SlitObservation",
+    "SlitSpectrograph",
     "Throughput",
     "photon_energy",
 ]

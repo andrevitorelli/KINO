@@ -28,12 +28,20 @@ Rendering pipeline (``CLAUDE.md``: "PSF/LSF before sampling")
    the redshifted + Doppler-shifted wavelength, with a Gaussian width that
    is the intrinsic (turbulent) and instrumental (LSF) widths combined in
    quadrature (exact for two Gaussians), then partition that Gaussian's
-   flux across wavelength channels analytically (via the Gaussian CDF)
-   rather than by discretising and convolving.
+   flux across wavelength channels analytically (via the Gaussian CDF --
+   ``kino.instruments.base.gaussian_channel_fractions``) rather than by
+   discretising and convolving.
 3. Convolve each wavelength channel's oversampled spatial image with the
    PSF kernel, then bin down to the native spaxel grid.
 4. Convert physical flux to detected electrons via throughput, aperture,
-   and exposure time, then add sky, dark, and read noise.
+   and exposure time (``kino.instruments.base.photon_flux_to_electrons``),
+   then add sky, dark, and read noise
+   (``kino.instruments.base.apply_shot_and_read_noise``).
+
+This same pipeline -- steps 2 and 4 shared verbatim -- underlies
+``kino.instruments.slit.SlitSpectrograph``; only the spatial grid (step 1)
+and the spatial reduction (step 3) differ (a 2-D spaxel grid here, a
+slit-aligned grid truncated to the slit's width there).
 """
 
 from __future__ import annotations
@@ -44,15 +52,30 @@ from pathlib import Path
 import astropy.units as u
 import numpy as np
 import yaml
-from astropy.constants import c as C_LIGHT
 from scipy.signal import fftconvolve
-from scipy.special import erf
 
-from kino.instruments.base import LSF, PSF, Detector, Instrument, Throughput, photon_energy
+from kino.instruments.base import (
+    LSF,
+    PSF,
+    Detector,
+    Instrument,
+    Throughput,
+    apply_shot_and_read_noise,
+    doppler_center,
+    doppler_sigma,
+    gaussian_channel_fractions,
+    photon_flux_to_electrons,
+)
+from kino.instruments.config import (
+    detector_from_config,
+    lsf_from_config,
+    parse_quantity,
+    psf_from_config,
+    throughput_from_config,
+)
 from kino.io.base import Datacube
 
 _SPATIAL_OVERSAMPLE = 4
-_SQRT2 = np.sqrt(2.0)
 
 
 @dataclass
@@ -135,6 +158,10 @@ class IFU(Instrument):
         """Collecting area, accounting for ``obstruction_fraction``."""
         return np.pi * (self.aperture_diameter / 2.0) ** 2 * (1.0 - self.obstruction_fraction)
 
+    @property
+    def band_center(self) -> u.Quantity:
+        return 0.5 * (self.wavelength_min + self.wavelength_max)
+
     def _spatial_grid(self):
         ov = _SPATIAL_OVERSAMPLE
         pix_over = (self.pixel_scale / ov).to(u.arcsec)
@@ -188,38 +215,23 @@ class IFU(Instrument):
         pixel_area_over = pix_over**2
         flux_per_pixel = sb * pixel_area_over.to_value(u.arcsec**2) * (line_flux / flux_norm)
 
-        c_kms = C_LIGHT.to(u.km / u.s)
-        lambda_center = (
-            line_wavelength * (1.0 + z) * (1.0 + (vlos / c_kms).to_value(u.dimensionless_unscaled))
-        )
-        sigma_intrinsic = lambda_center * (sigma_v / c_kms).to_value(u.dimensionless_unscaled)
+        line_center = doppler_center(vlos, line_wavelength, z)
+        sigma_intrinsic = doppler_sigma(sigma_v, line_center)
 
         wave_edges = np.linspace(self.wavelength_min, self.wavelength_max, self.n_wave + 1)
         wave_centers = 0.5 * (wave_edges[:-1] + wave_edges[1:])
         lsf_sigma = self.lsf.sigma(wave_centers)
 
-        sigma_tot = np.sqrt(
-            sigma_intrinsic.to_value(line_wavelength.unit)[np.newaxis, :, :] ** 2
-            + lsf_sigma.to_value(line_wavelength.unit)[:, np.newaxis, np.newaxis] ** 2
+        channel_fraction = gaussian_channel_fractions(
+            line_center, sigma_intrinsic, lsf_sigma, wave_edges
         )
-        lo = (
-            wave_edges[:-1].to_value(line_wavelength.unit)[:, np.newaxis, np.newaxis]
-            - lambda_center.to_value(line_wavelength.unit)[np.newaxis, :, :]
-        )
-        hi = (
-            wave_edges[1:].to_value(line_wavelength.unit)[:, np.newaxis, np.newaxis]
-            - lambda_center.to_value(line_wavelength.unit)[np.newaxis, :, :]
-        )
-        channel_fraction = 0.5 * (erf(hi / (_SQRT2 * sigma_tot)) - erf(lo / (_SQRT2 * sigma_tot)))
-
         flux_cube_over = (
             flux_per_pixel.to_value(line_flux.unit)[np.newaxis, :, :] * channel_fraction
         )
 
-        band_center = 0.5 * (self.wavelength_min + self.wavelength_max)
         kernel = self.psf.kernel(
             pix_over,
-            wavelength=band_center,
+            wavelength=self.band_center,
             aperture_diameter=self.aperture_diameter,
             obscuration=self.obstruction_fraction,
         )
@@ -231,16 +243,10 @@ class IFU(Instrument):
         flux_native = flux_cube_over.reshape(self.n_wave, self.ny, ov, self.nx, ov).sum(axis=(2, 4))
         flux_native = flux_native * line_flux.unit
 
-        e_photon = photon_energy(wave_centers)
-        throughput_k = self.throughput(wave_centers)
         exposure_total = self.exposure_time * self.n_exposures
-
-        signal_electron = (
-            (flux_native / e_photon[:, np.newaxis, np.newaxis])
-            * throughput_k[:, np.newaxis, np.newaxis]
-            * self.effective_area
-            * exposure_total
-        ).to_value(u.dimensionless_unscaled)
+        signal_electron = photon_flux_to_electrons(
+            flux_native, wave_centers, self.throughput, self.effective_area, exposure_total
+        )
 
         sky_electron = np.broadcast_to(
             (self.sky_electron_rate * exposure_total).to_value(u.electron),
@@ -249,14 +255,9 @@ class IFU(Instrument):
         dark_electron = (self.detector.dark_current * exposure_total).to_value(u.electron)
 
         expected = signal_electron + sky_electron + dark_electron
-        read_sigma = self.detector.read_noise.to_value(u.electron) * np.sqrt(self.n_exposures)
-        variance = expected + read_sigma**2
-
-        if rng is None:
-            counts = expected
-        else:
-            counts = rng.poisson(np.clip(expected, 0.0, None)).astype(float)
-            counts = counts + rng.normal(0.0, read_sigma, size=counts.shape)
+        counts, variance = apply_shot_and_read_noise(
+            expected, self.detector.read_noise, self.n_exposures, rng
+        )
 
         return Datacube(
             flux=counts,
@@ -278,58 +279,26 @@ class IFU(Instrument):
     def from_config(cls, path: str | Path) -> IFU:
         """Build an ``IFU`` from a YAML config (``kino/config/*.yaml``).
 
-        Every physical quantity is a string astropy.units.Quantity can
-        parse, e.g. ``"0.0125 arcsec"``, ``"25.4 m"``, ``"900 s"``. See
+        See ``kino.instruments.config`` for the quantity-string format and
         ``kino/config/gmtifs.yaml`` for a fully worked example.
         """
         with open(path) as f:
             cfg = yaml.safe_load(f)
 
-        psf = PSF(seeing_fwhm=_q(cfg["psf"]["seeing_fwhm"]), **_optical_aberrations(cfg["psf"]))
-        lsf = LSF(**{k: (_q(v) if k == "fwhm" else v) for k, v in cfg["lsf"].items()})
-        throughput = Throughput(
-            wavelength=u.Quantity([_q(v) for v in cfg["throughput"]["wavelength"]]),
-            transmission=np.asarray(cfg["throughput"]["transmission"], dtype=float),
-        )
-        detector = Detector(
-            read_noise=_q(cfg["detector"]["read_noise"]),
-            dark_current=_q(cfg["detector"]["dark_current"]),
-        )
         return cls(
-            pixel_scale=_q(cfg["pixel_scale"]),
+            pixel_scale=parse_quantity(cfg["pixel_scale"]),
             nx=cfg["nx"],
             ny=cfg["ny"],
-            wavelength_min=_q(cfg["wavelength_min"]),
-            wavelength_max=_q(cfg["wavelength_max"]),
+            wavelength_min=parse_quantity(cfg["wavelength_min"]),
+            wavelength_max=parse_quantity(cfg["wavelength_max"]),
             n_wave=cfg["n_wave"],
-            psf=psf,
-            lsf=lsf,
-            throughput=throughput,
-            aperture_diameter=_q(cfg["aperture_diameter"]),
-            detector=detector,
-            exposure_time=_q(cfg["exposure_time"]),
+            psf=psf_from_config(cfg["psf"]),
+            lsf=lsf_from_config(cfg["lsf"]),
+            throughput=throughput_from_config(cfg["throughput"]),
+            aperture_diameter=parse_quantity(cfg["aperture_diameter"]),
+            detector=detector_from_config(cfg["detector"]),
+            exposure_time=parse_quantity(cfg["exposure_time"]),
             obstruction_fraction=cfg.get("obstruction_fraction", 0.0),
             n_exposures=cfg.get("n_exposures", 1),
-            sky_electron_rate=_q(cfg.get("sky_electron_rate", "0 electron / s")),
+            sky_electron_rate=parse_quantity(cfg.get("sky_electron_rate", "0 electron / s")),
         )
-
-
-def _q(value: str | u.Quantity) -> u.Quantity:
-    """Parse a ``"<value> <unit>"`` config string into a Quantity."""
-    return u.Quantity(value) if isinstance(value, str) else value
-
-
-_OPTICAL_ABERRATION_KEYS = (
-    "defocus",
-    "astig1",
-    "astig2",
-    "coma1",
-    "coma2",
-    "trefoil1",
-    "trefoil2",
-    "spher",
-)
-
-
-def _optical_aberrations(psf_cfg: dict) -> dict[str, float]:
-    return {k: float(psf_cfg[k]) for k in _OPTICAL_ABERRATION_KEYS if k in psf_cfg}

@@ -1,0 +1,49 @@
+# GMACS-like single-slit config -- README.md Phase 7 (MANIFEST+GMACS-like
+# forecast: fibre-IFU bundles / multi-slit, R~2-5k, optical; survey-scale
+# multiplex).
+#
+# These are FIDUCIAL / representative values, not GMACS's official as-built
+# specs. GMACS is a multi-object spectrograph (many slits on one mask);
+# kino.instruments.slit.SlitSpectrograph models a single slit -- treat this
+# as one slitlet of a larger mask design, not the full multiplexed
+# instrument. Load with kino.instruments.slit.SlitSpectrograph.from_config,
+# then override any field to explore a real design's actual numbers.
+#
+# Unlike GMTIFS's AO-fed NIR IFU (kino/config/gmtifs.yaml), GMACS is a
+# ground-seeing-limited optical spectrograph: no AO correction, larger
+# seeing FWHM, and a wider slit sized to the atmospheric PSF rather than the
+# diffraction limit.
+
+slit_width: "0.9 arcsec"        # seeing-limited slit width
+pixel_scale: "0.15 arcsec"      # along-slit spatial sampling
+n_spatial: 100                  # 100 * 0.15" = 15" slit length
+slit_pa: 0.0                    # degrees, East of North
+# slit_offset defaults to (0, 0) -- centred on the target
+margin: 10
+
+wavelength_min: "0.50 um"
+wavelength_max: "0.52 um"
+n_wave: 100
+
+lsf:
+  resolving_power: 3000         # mid of the 2-5k range
+
+psf:
+  seeing_fwhm: "0.7 arcsec"     # ground-based, seeing-limited (no AO)
+  # defocus, coma*, astig*, trefoil*, spher default to 0.0 (unaberrated optics)
+
+throughput:
+  wavelength: ["0.50 um", "0.51 um", "0.52 um"]
+  transmission: [0.28, 0.32, 0.28]   # fiducial telescope+instrument+QE
+
+aperture_diameter: "24.5 m"     # GMT effective collecting-area diameter
+obstruction_fraction: 0.0       # already netted into the effective diameter above
+
+detector:
+  read_noise: "3 electron"      # fiducial optical CCD
+  dark_current: "0.001 electron / s"
+
+exposure_time: "1800 s"
+n_exposures: 2                  # 1 hour total integration
+
+sky_electron_rate: "8 electron / s"   # fiducial optical sky background, per pixel

@@ -28,10 +28,12 @@ import galsim
 import numpy as np
 from astropy.constants import c as C_LIGHT
 from astropy.constants import h as PLANCK_H
+from scipy.special import erf
 
 from kino.io.base import Datacube
 
 _FWHM_TO_SIGMA = 1.0 / (2.0 * np.sqrt(2.0 * np.log(2.0)))
+_SQRT2 = np.sqrt(2.0)
 
 
 def photon_energy(wavelength: u.Quantity) -> u.Quantity:
@@ -216,6 +218,100 @@ class Detector:
             raise ValueError("read_noise must be non-negative")
         if self.dark_current < 0:
             raise ValueError("dark_current must be non-negative")
+
+
+def doppler_center(vlos: u.Quantity, line_wavelength: u.Quantity, redshift: float) -> u.Quantity:
+    """Observed-frame wavelength of a line at rest wavelength ``line_wavelength``,
+    redshift ``redshift``, and line-of-sight velocity ``vlos`` (``CLAUDE.md``:
+    positive = redshifted/receding)."""
+    c_kms = C_LIGHT.to(u.km / u.s)
+    return (
+        line_wavelength
+        * (1.0 + redshift)
+        * (1.0 + (vlos / c_kms).to_value(u.dimensionless_unscaled))
+    )
+
+
+def doppler_sigma(sigma_v: u.Quantity, line_center: u.Quantity) -> u.Quantity:
+    """Wavelength-domain sigma of a turbulent line of velocity dispersion
+    ``sigma_v`` centred at ``line_center``."""
+    c_kms = C_LIGHT.to(u.km / u.s)
+    return line_center * (sigma_v / c_kms).to_value(u.dimensionless_unscaled)
+
+
+def gaussian_channel_fractions(
+    line_center: u.Quantity,
+    intrinsic_sigma: u.Quantity,
+    lsf_sigma: u.Quantity,
+    wave_edges: u.Quantity,
+) -> np.ndarray:
+    """Fraction of a Gaussian line's flux falling in each wavelength channel.
+
+    The line's width is ``intrinsic_sigma`` (turbulent broadening) and
+    ``lsf_sigma`` (instrumental) combined in quadrature (exact for two
+    Gaussians -- see ``kino.instruments.ifu``'s module docstring), with
+    each channel's share found analytically via the Gaussian CDF rather
+    than by discretising and convolving.
+
+    ``line_center`` and ``intrinsic_sigma`` have some spatial shape ``S``
+    (e.g. ``(ny, nx)`` for an IFU, ``(n_u,)`` along a slit); ``lsf_sigma``
+    has shape ``(n_wave,)``; ``wave_edges`` has shape ``(n_wave + 1,)``.
+    Returns an ``(n_wave,) + S`` array of fractions in ``[0, 1]``.
+    """
+    unit = line_center.unit
+    pad = (1,) * line_center.ndim
+    center = line_center.to_value(unit)[np.newaxis, ...]
+    sigma_tot = np.sqrt(
+        intrinsic_sigma.to_value(unit)[np.newaxis, ...] ** 2
+        + lsf_sigma.to_value(unit).reshape((-1,) + pad) ** 2
+    )
+    lo = wave_edges[:-1].to_value(unit).reshape((-1,) + pad)
+    hi = wave_edges[1:].to_value(unit).reshape((-1,) + pad)
+    return 0.5 * (
+        erf((hi - center) / (_SQRT2 * sigma_tot)) - erf((lo - center) / (_SQRT2 * sigma_tot))
+    )
+
+
+def photon_flux_to_electrons(
+    flux: u.Quantity,
+    wave_centers: u.Quantity,
+    throughput: Throughput,
+    effective_area: u.Quantity,
+    exposure_total: u.Quantity,
+) -> np.ndarray:
+    """Physical flux per wavelength channel -> detected electrons.
+
+    ``flux`` (energy / time / area) has shape ``(n_wave,) + S``;
+    ``wave_centers`` has shape ``(n_wave,)``. Returns a plain ``(n_wave,) + S``
+    array (electron counts, unitless).
+    """
+    pad = (1,) * (flux.ndim - 1)
+    e_photon = photon_energy(wave_centers).reshape((-1,) + pad)
+    t = throughput(wave_centers).reshape((-1,) + pad)
+    return (flux / e_photon * t * effective_area * exposure_total).to_value(
+        u.dimensionless_unscaled
+    )
+
+
+def apply_shot_and_read_noise(
+    expected_electron: np.ndarray,
+    read_noise: u.Quantity,
+    n_exposures: int,
+    rng: np.random.Generator | None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Poisson shot noise (on ``expected_electron``, e.g. source + sky + dark)
+    plus Gaussian read noise (``sqrt(n_exposures) * read_noise``).
+
+    Returns ``(counts, variance)``; ``rng=None`` returns ``expected_electron``
+    itself as ``counts`` (noiseless) with ``variance`` still populated.
+    """
+    read_sigma = read_noise.to_value(u.electron) * np.sqrt(n_exposures)
+    variance = expected_electron + read_sigma**2
+    if rng is None:
+        return expected_electron, variance
+    counts = rng.poisson(np.clip(expected_electron, 0.0, None)).astype(float)
+    counts = counts + rng.normal(0.0, read_sigma, size=counts.shape)
+    return counts, variance
 
 
 class Instrument(ABC):

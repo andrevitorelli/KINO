@@ -170,21 +170,33 @@ tests and a runnable example before the next begins.
       that module's docstring for the flux-calibration convention (physical
       `line_flux` supplied at `observe()` time, not on `DiscGalaxy`) and the
       PSF/LSF-before-sampling rendering pipeline.
-- [ ] Extract moment maps (flux, Vlos, σ) with noise from an IFU `Datacube` --
-      not yet implemented; a measurement *on* a cube rather than part of the
-      forward model, so its natural home is `kino.analysis` (Phase 6) rather
-      than here.
-- [ ] **Slit / grism backend**: slit mask geometry & placement, dispersion to a
+- [x] Extract moment maps (flux, Vlos, σ) with noise from any `Datacube` -- a
+      measurement *on* a cube rather than part of the forward model, so it
+      lives in `kino.analysis.moments` (Phase 6) rather than in
+      `kino.instruments`: flux-weighted spectral moments, delta-method error
+      propagation from per-voxel `variance`, S/N-based masking, and optional
+      LSF-broadening removal in quadrature. Works on an IFU or slit-spectrum
+      `Datacube`, a KinMS cube, or real survey data alike.
+- [x] **Slit / grism backend**: slit mask geometry & placement, dispersion to a
       2-D spectrum, companion broadband image; handle slit losses & misalignment.
+      `kino.instruments.slit.SlitSpectrograph.observe` -> `SlitObservation`
+      (a `(n_wave, n_spatial, 1)` `Datacube` spectrum plus an un-truncated
+      broadband image); slit losses and misalignment fall directly out of
+      rendering on a padded, slit-aligned grid and truncating to the true
+      aperture -- see that module's docstring.
 - [x] Noise models: photon + read noise + sky; configurable exposure time and
-      throughput curves. `IFU.observe` combines Poisson source/sky/dark shot
-      noise with Gaussian read noise; `rng=None` returns the noiseless
-      expected-count cube with `variance` still populated (for S/N without
-      drawing a realisation).
-- [x] Instrument config files for a GMTIFS-like setup (`kino/config/gmtifs.yaml`,
-      loaded via `IFU.from_config`); a GMACS-like one is deferred to the
-      slit/grism backend.
-- [x] Tests: flux conservation, PSF/LSF broadening, S/N vs. exposure scaling.
+      throughput curves. `IFU.observe`/`SlitSpectrograph.observe` combine
+      Poisson source/sky/dark shot noise with Gaussian read noise (shared via
+      `kino.instruments.base.apply_shot_and_read_noise`); `rng=None` returns
+      the noiseless expected-count cube with `variance` still populated (for
+      S/N without drawing a realisation).
+- [x] Instrument config files for a GMTIFS-like (`kino/config/gmtifs.yaml`) and
+      a GMACS-like (`kino/config/gmacs.yaml`, one slit of a multi-object mask)
+      setup, loaded via `IFU.from_config` / `SlitSpectrograph.from_config`.
+- [x] Tests: flux conservation, PSF/LSF broadening, S/N vs. exposure scaling,
+      slit losses (width/offset/misalignment), moment-map recovery against
+      known truth, and delta-method error propagation against Monte Carlo
+      scatter.
       `tests/instruments/`.
 
 ### Phase 4 — Mock data generation
