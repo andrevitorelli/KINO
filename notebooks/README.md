@@ -42,9 +42,20 @@ the order to read them in.
   datacube, or slit/grism spectrum) -> `nautilus`-sampled (g1, g2) posterior,
   compared against the injected truth. Still a scaffold — markdown cells lay
   out the full narrative and code cells sketch the intended calls, but most
-  cells will not execute until `kino.instruments` and `kino.inference` land
-  (see the roadmap in the top-level `README.md`; the galaxy and lensing
-  halves are done, see `01_discgalaxy_demo.ipynb`,
-  `02_shear_misalignment_demo.ipynb`, and
-  `03_tully_fisher_shear_signal.ipynb`). Fill in and re-run each section as
-  its phase ships, rather than restructuring the narrative.
+  cells will not execute until `kino.inference` lands (see the roadmap in the
+  top-level `README.md`; the galaxy, lensing, and IFU-instrument halves are
+  done, see `01_discgalaxy_demo.ipynb`, `02_shear_misalignment_demo.ipynb`,
+  `03_tully_fisher_shear_signal.ipynb`, and `05_ifu_instrument_demo.ipynb`).
+  Fill in and re-run each section as its phase ships, rather than
+  restructuring the narrative.
+- `05_ifu_instrument_demo.ipynb` — **runs today.** Demonstrates
+  `kino.instruments` (Phase 3): renders a lensed `DiscGalaxy` scene through
+  `kino.instruments.ifu.IFU`, loaded from the GMTIFS-like fiducial config
+  (`kino/config/gmtifs.yaml`) -- detector/pixelization/PSF/LSF/throughput
+  settings printed straight from the config, the actual `galsim`
+  optical+seeing PSF kernel, the rendered (pixelized, PSF-convolved) cube
+  next to the intrinsic continuous scene for comparison, a noiseless vs.
+  noisy realisation with per-spaxel S/N, and sweeps of seeing and spectral
+  resolution. See `tests/instruments/` for the invariants (flux
+  conservation, PSF/LSF broadening, S/N vs. exposure) this notebook shows
+  visually.
