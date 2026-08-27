@@ -25,10 +25,18 @@ Read it before making changes. Keep it up to date as the project evolves.
 > reusing the same PSF/LSF/noise machinery; both config-loadable via
 > `IFU.from_config`/`SlitSpectrograph.from_config` and
 > `kino/config/gmtifs.yaml`/`kino/config/gmacs.yaml`), `kino.io`
-> (`Datacube` + KinMS generator, ahead of the rest of Phase 6 per
-> `TEST_DATA.md`), and `kino.analysis.moments` (flux/Vlos/dispersion moment
-> maps with delta-method error propagation from any `Datacube`, also ahead of
-> the rest of Phase 6) are implemented and tested. Phases 4-5
+> (`Datacube` + KinMS generator, plus a MaNGIA reader/downloader started
+> early -- see below -- ahead of the rest of Phase 6 per `TEST_DATA.md`),
+> and `kino.analysis.moments` (flux/Vlos/dispersion moment maps with
+> delta-method error propagation from any `Datacube`, also ahead of the rest
+> of Phase 6) are implemented and tested. **`kino.io.manga.read_mangia_cube`
+> and `kino.io.download`'s MaNGIA fixture manifest are unverified against
+> real data** -- this session had no IllustrisTNG API key (needed to browse
+> the MaNGIA catalogue; free registration at
+> https://www.tng-project.org/users/register/), so both were written from
+> documented file structure and tested against a synthetic stand-in cube
+> instead (`notebooks/06_mangia_datacube_demo.ipynb`); see both modules'
+> docstrings before trusting them against a real file. Phases 4-5
 > (mocks/inference) have not started, so `examples/`,
 > `notebooks/04_one_galaxy_inference.ipynb`, and the rest of `kino/analysis/`
 > are still placeholders that raise `NotImplementedError`.
@@ -149,7 +157,20 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   masked to NaN. `lsf_sigma` (velocity units) optionally removes
   instrumental broadening from `dispersion` in quadrature — pass it
   yourself; the function has no notion of which instrument produced the
-  cube.
+  cube. **Keep the cube's spectral window to a few times the line's actual
+  extent before calling this** — `dispersion`'s `(v - vlos)**2` weighting
+  amplifies noise from channels far from the line far more than
+  `flux`/`vlos`'s weighting does, and can silently collapse `dispersion` to
+  0 (clipped) even at a flux/vlos S/N that looks fine. See the module
+  docstring's "window width matters" section.
+- **External-data readers (`kino.io.manga`, `kino.io.download`):** convert
+  to KINO's conventions in the reader, not downstream (`TEST_DATA.md`
+  Section 5) — but check each reader's own module docstring for which
+  conventions that reader has actually confirmed against a real file vs.
+  assumed from documentation. `read_mangia_cube` is currently the latter
+  (unverified; see the status banner above) — treat its wavelength-axis,
+  pixel-scale, flux-unit, and mask-polarity defaults as starting points to
+  check, not facts, until tested against a real MaNGIA cube.
 
 ## Repository layout (target)
 

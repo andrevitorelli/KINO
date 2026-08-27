@@ -64,5 +64,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
   `variance`, S/N-based masking, and optional LSF-broadening removal.
   Verified against a real `IFU.observe()` cube's known-truth Vlos/dispersion,
   and against Monte Carlo noise-realisation scatter for the error estimates.
+  Its docstring also documents a real usage caveat surfaced while building
+  the notebook below: the flux-weighted second moment (`dispersion`) is far
+  more noise-fragile than `flux`/`vlos` over a spectral window much wider
+  than the line.
+- **Phase 6 (partial) — MaNGIA reader and downloader**: `kino.io.download.fetch_file`
+  (generic download + sha256 verification, cached under a git-ignored `data/`
+  dir) is implemented and tested against a local HTTP server. `kino.io.manga.read_mangia_cube`
+  parses a MaNGIA (TNG50 mock MaNGA, Sarmiento et al. 2022) FITS cube into a
+  `Datacube`. **Both are unverified against a real MaNGIA file**: MaNGIA's
+  premade cubes live on the IllustrisTNG data portal behind free user
+  registration and a personal API key, which this session didn't have --
+  `kino.io.download.MANGIA_FIXTURES`'s entries are placeholders pending that
+  access (see that module's docstring), and `read_mangia_cube` was written
+  from the mock generator's documented (not inspected) HDU layout. See
+  `notebooks/06_mangia_datacube_demo.ipynb` for a correctness demo against a
+  synthetic stand-in cube instead -- built by rendering a known galaxy
+  through `kino.instruments.ifu.IFU` and repackaging it into the same FITS
+  layout, exercising the reader and `kino.analysis.moments` together.
 
 [Unreleased]: https://github.com/andrevitorelli/KINO/compare/main...HEAD

@@ -223,10 +223,19 @@ summary level.
       wavelength/velocity axis, spaxel scale, variance/mask, redshift, units).
 - [x] `kino/io/kinms.py`: KinMS wrapper -> `Datacube`, for known-truth
       injection tests (Tier A). Position-angle convention pinned by tests.
-- [ ] `kino/io/manga.py`: reader for MaNGA/MaNGIA/iMaNGA FITS cubes ->
-      `Datacube` (Tiers B/C) — pending a real fixture file to read against.
-- [ ] `kino/io/download.py`: fetch-on-demand for the curated fixture subset,
-      with checksums, cached under a git-ignored `data/` dir.
+- [ ] `kino/io/manga.py`: reader for MaNGIA (TNG50 mock MaNGA) FITS cubes ->
+      `Datacube`. **Unverified against a real file** — written from the
+      documented HDU structure without a fixture to test against (no
+      TNG-project API key available this session); see that module's
+      docstring for exactly which conventions are read from the file vs.
+      assumed, and `notebooks/06_mangia_datacube_demo.ipynb` for a
+      correctness demo against a synthetic stand-in cube instead.
+- [ ] `kino/io/download.py`: `fetch_file()` (generic download + checksum
+      verification, cached under a git-ignored `data/` dir) is implemented
+      and tested against a local HTTP server. `fetch()` (the MaNGIA fixture
+      manifest, `TEST_DATA.md` Section 4) is not yet usable — every entry's
+      URL is a placeholder pending TNG-project API access to browse the
+      catalogue and confirm real subhalo IDs; see that module's docstring.
 - [ ] `kino/analysis/injection.py`: known-shear injection-recovery on any
       `Datacube`, reporting recovered (g1, g2), bias (m, c), residual σ_ε.
       Blocked on Phases 2, 3, 5 (`kino.lensing`, `kino.instruments`,

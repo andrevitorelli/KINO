@@ -27,6 +27,21 @@ measurable there, even though a (noisy) flux value still exists.
 This is *not* a line-fitting pipeline (no continuum model, no line-profile
 fit) -- it is the same moment-based measurement ``kino.lensing.moments``
 uses for spatial shape, applied along the spectral axis instead.
+
+Window width matters -- a real usage caveat
+----------------------------------------------
+``dispersion`` (a second moment, weighted by ``(v - vlos)**2``) is far more
+sensitive than ``flux``/``vlos`` to how much of ``cube.spectral_axis`` is
+*pure noise far from the line*: a channel's noise, however small, gets
+multiplied by a potentially huge ``dv**2`` there, so summed over many such
+channels it can dominate the numerator and drive ``dispersion`` to garbage
+(commonly clipped to exactly 0) even on an otherwise high-S/N line. This is
+a real property of the naive second-moment estimator, not a bug -- keep
+``cube``'s spectral window to a few times the line's expected total extent
+(Doppler range across the field, plus a handful of line widths of margin)
+before calling this function, rather than handing it, say, a full MaNGA
+wavelength range. ``flux`` and ``vlos`` degrade far more gracefully with a
+too-wide window; ``dispersion`` is the one to watch.
 """
 
 from __future__ import annotations

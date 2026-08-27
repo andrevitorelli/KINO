@@ -59,3 +59,16 @@ the order to read them in.
   resolution. See `tests/instruments/` for the invariants (flux
   conservation, PSF/LSF broadening, S/N vs. exposure) this notebook shows
   visually.
+- `06_mangia_datacube_demo.ipynb` — **runs today, against synthetic data.**
+  Demonstrates `kino.io.manga` (Phase 6, MaNGIA/TNG50 mock MaNGA cubes):
+  reads a FITS cube through `read_mangia_cube` and runs
+  `kino.analysis.moments.compute_moment_maps` on it. No real MaNGIA cube was
+  available (downloading one needs a free IllustrisTNG API key this session
+  didn't have -- see `kino/io/download.py`'s module docstring), so the cube
+  is a known galaxy rendered through `kino.instruments.ifu.IFU` and
+  repackaged into MaNGIA's documented FITS layout instead, which still
+  genuinely exercises the reader and the moment-map recovery against a
+  known truth. Also demonstrates, deliberately, a real numerical caveat:
+  `compute_moment_maps`'s `dispersion` collapsing under noise when the
+  spectral window is too wide relative to the line (see that function's
+  module docstring).
