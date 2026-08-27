@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+.ipynb_checkpoints/
+
+# curated/downloaded test-data cache -- see TEST_DATA.md Section 4
+data/
+
+# Windows/WSL zone-transfer artifacts
+*:Zone.Identifier
+
+# local Claude Code permission state
+.claude/settings.local.json

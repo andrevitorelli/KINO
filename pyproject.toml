@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kino"
+version = "0.1.0.dev0"
+description = "KInematic lensing iNference and mock-Observations"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "Andre Zvitorelli", email = "andrezvitorelli@gmail.com" }]
+
+dependencies = [
+    "numpy",
+    "scipy",
+    "astropy",
+    "nautilus-sampler",
+    "matplotlib",
+    "pyyaml",
+    "h5py",
+]
+
+[project.optional-dependencies]
+data = ["kinms"]
+dev = ["kino[data]", "ruff", "mypy", "pytest", "pytest-cov", "pre-commit"]
+notebooks = ["jupyterlab", "ipykernel"]
+
+[project.urls]
+Homepage = "https://github.com/andrevitorelli/KINO"
+
+[tool.hatch.build.targets.wheel]
+packages = ["kino"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
