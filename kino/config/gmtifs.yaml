@@ -1,0 +1,46 @@
+# GMTIFS-like IFU config -- README.md Phase 7 (AO PSF, 25-50 mas spaxels,
+# 4"x2" field, R~5-10k, 0.9-2.5 um; Halpha/[O III] kinematics of z~0.4-1.5
+# background discs).
+#
+# These are FIDUCIAL / representative values, not GMTIFS's official as-built
+# specs -- use kino.instruments.ifu.IFU.from_config, then override any field,
+# to explore a real proposal's actual numbers.
+#
+# The wavelength window here (1.10-1.14 um) is a single narrow science
+# setting centred on redshifted Halpha at z~0.68, not GMTIFS's full 0.9-2.5
+# um range -- a full-band, fully Nyquist-sampled cube at R~8000 would need
+# thousands of spectral channels. n_wave below is reduced well below
+# critical sampling for R=8000 so this config runs in seconds as a working
+# example; increase it towards Nyquist (~2-3 channels per LSF FWHM) for a
+# science-grade cube.
+
+pixel_scale: "0.05 arcsec"      # mid of the 25-50 mas AO-sampled range
+nx: 80                          # 80 * 0.05" = 4"
+ny: 40                          # 40 * 0.05" = 2"
+
+wavelength_min: "1.10 um"
+wavelength_max: "1.14 um"
+n_wave: 80
+
+lsf:
+  resolving_power: 8000         # mid of the 5-10k range
+
+psf:
+  seeing_fwhm: "0.05 arcsec"    # fiducial AO-corrected residual core width
+  # defocus, coma*, astig*, trefoil*, spher default to 0.0 (unaberrated optics)
+
+throughput:
+  wavelength: ["1.10 um", "1.11 um", "1.12 um", "1.13 um", "1.14 um"]
+  transmission: [0.30, 0.35, 0.35, 0.35, 0.30]   # fiducial telescope+AO+instrument+QE
+
+aperture_diameter: "24.5 m"     # GMT effective collecting-area diameter
+obstruction_fraction: 0.0       # already netted into the effective diameter above
+
+detector:
+  read_noise: "5 electron"      # fiducial NIR H2RG-class detector
+  dark_current: "0.01 electron / s"
+
+exposure_time: "600 s"
+n_exposures: 6                  # 1 hour total integration
+
+sky_electron_rate: "3 electron / s"   # fiducial NIR sky background, per spaxel

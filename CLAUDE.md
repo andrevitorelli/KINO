@@ -3,23 +3,28 @@
 This file orients Claude Code (and any AI assistant) working in this repository.
 Read it before making changes. Keep it up to date as the project evolves.
 
-> **Status: Phase 0 done; Phases 1-2 done; Phase 6 io-layer started early.**
+> **Status: Phase 0 done; Phases 1-2 done; Phase 3 IFU backend done (slit/grism
+> and moment-map extraction still open); Phase 6 io-layer started early.**
 > `pyproject.toml` and the `kino/` package skeleton exist and `pip install
 > -e ".[dev]"` / `ruff` / `pytest` work. Repo is git-initialised with an MIT
 > `LICENSE`, GitHub Actions CI (lint + test matrix), `pre-commit` config,
 > `CONTRIBUTING.md`, issue/PR templates, and `CHANGELOG.md`. Still missing:
-> `docs/` (deferred to Phase 8). Next up is Phase 3 (instrument backends).
-> `kino.galaxy`
+> `docs/` (deferred to Phase 8). `kino.galaxy`
 > (Phase 1: `DiscGalaxy`, Sersic profile, rotation curves, Vlos, dispersion,
 > ellipticity), `kino.lensing` (Phase 2: `apply_shear`/`LensedScene`, the
 > shear matrix + Mobius ellipticity composition + `magnification` in
 > `kino.lensing.shear`, and a flux-moment shape measurement in
-> `kino.lensing.moments`), and `kino.io`
+> `kino.lensing.moments`), `kino.instruments`
+> (Phase 3: `Instrument` base API, `PSF`/`LSF`/`Throughput`/`Detector` in
+> `kino.instruments.base`, and `kino.instruments.ifu.IFU` -- spaxel-grid
+> rendering, GalSim optical+atmospheric PSF, Gaussian LSF, and a
+> photon/sky/dark/read noise model, config-loadable via `IFU.from_config` and
+> `kino/config/gmtifs.yaml`), and `kino.io`
 > (`Datacube` + KinMS generator, ahead of the rest of Phase 6 per
-> `TEST_DATA.md`) are implemented and tested. Phases 3-5
-> (instrument/inference) have not started, so `examples/`,
-> `notebooks/04_one_galaxy_inference.ipynb`, and `kino/analysis/` are still
-> placeholders that raise `NotImplementedError`.
+> `TEST_DATA.md`) are implemented and tested. The slit/grism backend, moment-map
+> extraction from an IFU cube, and Phases 4-5 (mocks/inference) have not
+> started, so `examples/`, `notebooks/04_one_galaxy_inference.ipynb`, and
+> `kino/analysis/` are still placeholders that raise `NotImplementedError`.
 
 ## What KINO is
 
@@ -83,6 +88,34 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   never hard-code numeric distances.
 - **Randomness:** pass a `numpy.random.Generator` (seeded) explicitly; never call
   the global `np.random` state.
+- **Instrument flux calibration:** `DiscGalaxy.flux` (and everything derived from
+  it, e.g. a `LensedScene`'s `surface_brightness`) is in the galaxy's own
+  arbitrary units, not a physical flux — Phase 1 is intentionally unitless there.
+  Physical calibration happens at `Instrument.observe()` time: pass an explicit
+  `line_flux` (an `astropy.units.Quantity`, e.g. `erg/s/cm**2`) and the renderer
+  rescales the shape by `line_flux / galaxy.flux`. Because a `LensedScene` is
+  evaluated by sampling the *unlensed* galaxy at each observed (delensed) sky
+  position, the image-integrated flux comes out magnified relative to
+  `galaxy.flux` automatically (see `kino.lensing.shear.magnification` and
+  `kino/instruments/ifu.py`'s module docstring) — `line_flux` is the source's
+  intrinsic, unlensed brightness; never re-apply magnification on top of it.
+- **Instrument PSF/LSF:** the spatial PSF is `galsim.OpticalPSF` (aperture
+  diffraction) convolved with `galsim.Kolmogorov` (atmospheric seeing,
+  `PSF.seeing_fwhm`), evaluated once per `observe()` call at the band's central
+  wavelength (**achromatic within a cube** — a documented simplification, not a
+  physical claim that real PSFs don't vary with wavelength). The LSF
+  (`kino.instruments.base.LSF`) is Gaussian, so instrumental and intrinsic
+  (turbulent) broadening combine in quadrature rather than by explicit
+  numerical convolution.
+- **Instrument noise / sky background:** `IFU.observe` returns detected
+  **electrons** (`Datacube.flux_unit = astropy.units.electron`), combining
+  Poisson source + sky + dark-current shot noise with Gaussian read noise
+  (`variance` is always populated; `rng=None` returns the noiseless
+  expected-count cube instead of drawing a realisation). Sky background
+  (`IFU.sky_electron_rate`) is specified **already as a detected electron rate
+  per spaxel** (as from an observatory's own exposure-time calculator), not a
+  sky surface brightness — it does not go through the source's
+  throughput/aperture pipeline.
 
 ## Repository layout (target)
 

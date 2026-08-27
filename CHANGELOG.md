@@ -25,5 +25,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
 - **Phase 6 (partial) — io layer**: `kino.io.base.Datacube` container and
   `kino.io.kinms` KinMS-backed generator for known-truth injection tests, per
   the validation-data plan in `TEST_DATA.md`.
+- **Phase 3 (partial) — IFU instrument backend**: `kino.instruments.base`
+  (`Instrument` ABC, `PSF` -- `galsim.OpticalPSF` diffraction convolved with
+  `galsim.Kolmogorov` seeing, `LSF`, `Throughput`, `Detector`) and
+  `kino.instruments.ifu.IFU`, which renders a `LensedScene`'s emission line
+  into a `Datacube` of detected electrons: spatially oversampled PSF
+  convolution, analytic (erf-based) Gaussian line binning onto the wavelength
+  axis with instrumental and intrinsic broadening combined in quadrature, and
+  a photon + sky + dark-current + read noise model (`rng=None` returns the
+  noiseless expected-count cube with `variance` populated). Physical flux
+  calibration is supplied at `observe()` time (`line_flux`), not on
+  `DiscGalaxy`, and the observed (lensed) flux comes out correctly magnified
+  automatically -- see `kino/instruments/ifu.py`'s module docstring and the
+  new "Instrument flux calibration" convention in `CLAUDE.md`. Config-loadable
+  via `IFU.from_config` and a GMTIFS-like fiducial config,
+  `kino/config/gmtifs.yaml`. The slit/grism backend and moment-map extraction
+  from an IFU cube are not yet implemented.
 
 [Unreleased]: https://github.com/andrevitorelli/KINO/compare/main...HEAD

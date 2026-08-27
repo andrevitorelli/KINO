@@ -161,16 +161,31 @@ tests and a runnable example before the next begins.
       (`notebooks/03_tully_fisher_shear_signal.ipynb`).
 
 ### Phase 3 — Instrument backends
-- [ ] Define the `Instrument` base API: `observe(scene) -> MockData`, plus PSF,
-      LSF, spatial sampling, throughput, and noise hooks.
-- [ ] **IFU backend**: spaxel grid, AO/seeing PSF convolution, spectral LSF,
-      datacube assembly; extract moment maps (flux, Vlos, σ) with noise.
+- [x] Define the `Instrument` base API: `observe(scene) -> MockData`, plus PSF,
+      LSF, spatial sampling, throughput, and noise hooks. `kino.instruments.base`:
+      `PSF` (`galsim.OpticalPSF` diffraction convolved with `galsim.Kolmogorov`
+      seeing), `LSF`, `Throughput`, `Detector`, and the `Instrument` ABC.
+- [x] **IFU backend**: spaxel grid, AO/seeing PSF convolution, spectral LSF,
+      datacube assembly. `kino.instruments.ifu.IFU.observe` -> `Datacube`; see
+      that module's docstring for the flux-calibration convention (physical
+      `line_flux` supplied at `observe()` time, not on `DiscGalaxy`) and the
+      PSF/LSF-before-sampling rendering pipeline.
+- [ ] Extract moment maps (flux, Vlos, σ) with noise from an IFU `Datacube` --
+      not yet implemented; a measurement *on* a cube rather than part of the
+      forward model, so its natural home is `kino.analysis` (Phase 6) rather
+      than here.
 - [ ] **Slit / grism backend**: slit mask geometry & placement, dispersion to a
       2-D spectrum, companion broadband image; handle slit losses & misalignment.
-- [ ] Noise models: photon + read noise + sky; configurable exposure time and
-      throughput curves.
-- [ ] Instrument config files for a GMTIFS-like and a GMACS-like setup.
-- [ ] Tests: flux conservation, PSF/LSF broadening, S/N vs. exposure scaling.
+- [x] Noise models: photon + read noise + sky; configurable exposure time and
+      throughput curves. `IFU.observe` combines Poisson source/sky/dark shot
+      noise with Gaussian read noise; `rng=None` returns the noiseless
+      expected-count cube with `variance` still populated (for S/N without
+      drawing a realisation).
+- [x] Instrument config files for a GMTIFS-like setup (`kino/config/gmtifs.yaml`,
+      loaded via `IFU.from_config`); a GMACS-like one is deferred to the
+      slit/grism backend.
+- [x] Tests: flux conservation, PSF/LSF broadening, S/N vs. exposure scaling.
+      `tests/instruments/`.
 
 ### Phase 4 — Mock data generation
 - [ ] `mocks` layer assembling galaxy + shear + instrument into data products.
