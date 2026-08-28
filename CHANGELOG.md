@@ -82,5 +82,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
   synthetic stand-in cube instead -- built by rendering a known galaxy
   through `kino.instruments.ifu.IFU` and repackaging it into the same FITS
   layout, exercising the reader and `kino.analysis.moments` together.
+- `notebooks/07_moment_window_width_caveat.ipynb`: a focused deep-dive on
+  the window-width caveat above, on pure synthetic single-spaxel spectra
+  (no dependence on `kino.instruments`/`kino.io`) -- one line at three
+  window widths, a per-channel breakdown of what dominates the dispersion
+  sum, and a 300-realisation Monte Carlo sweep mapping the collapse rate
+  and the (much milder) degradation of `vlos` by contrast. Also refined
+  the caveat itself: a too-*narrow* window is just as broken (truncation
+  bias), so there is a sweet spot, not just an upper bound on window
+  width -- both `kino.analysis.moments`' docstring and `CLAUDE.md` were
+  updated accordingly.
 
 [Unreleased]: https://github.com/andrevitorelli/KINO/compare/main...HEAD

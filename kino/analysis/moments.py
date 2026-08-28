@@ -42,6 +42,15 @@ a real property of the naive second-moment estimator, not a bug -- keep
 before calling this function, rather than handing it, say, a full MaNGA
 wavelength range. ``flux`` and ``vlos`` degrade far more gracefully with a
 too-wide window; ``dispersion`` is the one to watch.
+
+The failure isn't one-sided, either: a window that's too *narrow* truncates
+the line's own wings before they reach the background, biasing
+``dispersion`` low -- and a biased-low variance estimate is just as easily
+pushed negative (and clipped to 0) by noise as a noise-dominated wide one
+is. There is a sweet spot, not just an upper bound; see
+``notebooks/07_moment_window_width_caveat.ipynb`` for a quantified sweep
+across window widths (collapse rate, recovered dispersion, and ``vlos``
+scatter for comparison) that maps it out on a synthetic line.
 """
 
 from __future__ import annotations

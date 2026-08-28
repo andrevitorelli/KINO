@@ -161,8 +161,12 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   extent before calling this** — `dispersion`'s `(v - vlos)**2` weighting
   amplifies noise from channels far from the line far more than
   `flux`/`vlos`'s weighting does, and can silently collapse `dispersion` to
-  0 (clipped) even at a flux/vlos S/N that looks fine. See the module
-  docstring's "window width matters" section.
+  0 (clipped) even at a flux/vlos S/N that looks fine. The failure isn't
+  one-sided — too *narrow* a window truncates the line's own wings and
+  biases `dispersion` low, which collapses just as easily; there's a sweet
+  spot, not just an upper bound. See the module docstring's "window width
+  matters" section and `notebooks/07_moment_window_width_caveat.ipynb`
+  for a quantified sweep.
 - **External-data readers (`kino.io.manga`, `kino.io.download`):** convert
   to KINO's conventions in the reader, not downstream (`TEST_DATA.md`
   Section 5) — but check each reader's own module docstring for which

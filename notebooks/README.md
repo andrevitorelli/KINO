@@ -72,3 +72,14 @@ the order to read them in.
   `compute_moment_maps`'s `dispersion` collapsing under noise when the
   spectral window is too wide relative to the line (see that function's
   module docstring).
+- `07_moment_window_width_caveat.ipynb` — **runs today.** A focused,
+  self-contained deep-dive on the caveat `06` surfaces in passing: derives
+  why the flux-weighted second moment (dispersion) is far more
+  noise-fragile than flux/`Vlos`, shows one line at three window widths
+  (too narrow truncates the line itself; too wide is noise-dominated; a
+  "sweet spot" in between recovers it), visualises the per-channel
+  contribution to the dispersion sum to show *which* channels break it,
+  and sweeps window width over 300 Monte Carlo realisations each to map
+  the collapse rate and show `Vlos` degrading gracefully by contrast. Pure
+  synthetic single-spaxel spectra -- no dependence on `kino.instruments`
+  or `kino.io`.
