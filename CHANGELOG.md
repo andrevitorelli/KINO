@@ -92,5 +92,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
   bias), so there is a sweet spot, not just an upper bound on window
   width -- both `kino.analysis.moments`' docstring and `CLAUDE.md` were
   updated accordingly.
+- **Two mitigations for the window-width caveat**: `kino.analysis.moments.crop_to_line`
+  crops a `Datacube`'s spectral axis to a window around a given centre
+  (the safe path, made the easy path), and `compute_moment_maps` gained a
+  `check_window` diagnostic (on by default) that stacks the cube's flux,
+  estimates the fraction of channels "effectively" carrying it via a
+  participation-ratio calculation, and emits a `UserWarning` when that
+  fraction looks too small -- the too-wide failure mode specifically (it
+  does not catch too-narrow, which has no comparably robust automatic
+  signal). Calibrated against and demonstrated in
+  `notebooks/07_moment_window_width_caveat.ipynb`.
 
 [Unreleased]: https://github.com/andrevitorelli/KINO/compare/main...HEAD

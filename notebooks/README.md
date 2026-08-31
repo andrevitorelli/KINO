@@ -80,6 +80,10 @@ the order to read them in.
   "sweet spot" in between recovers it), visualises the per-channel
   contribution to the dispersion sum to show *which* channels break it,
   and sweeps window width over 300 Monte Carlo realisations each to map
-  the collapse rate and show `Vlos` degrading gracefully by contrast. Pure
+  the collapse rate and show `Vlos` degrading gracefully by contrast. Also
+  demonstrates the two mitigations this notebook motivated:
+  `kino.analysis.moments.crop_to_line` (crop a cube to near the line before
+  measuring moments) and `compute_moment_maps`'s built-in `check_window`
+  diagnostic, which warns when a window looks implausibly wide. Pure
   synthetic single-spaxel spectra -- no dependence on `kino.instruments`
   or `kino.io`.

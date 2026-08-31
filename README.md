@@ -176,7 +176,11 @@ tests and a runnable example before the next begins.
       `kino.instruments`: flux-weighted spectral moments, delta-method error
       propagation from per-voxel `variance`, S/N-based masking, and optional
       LSF-broadening removal in quadrature. Works on an IFU or slit-spectrum
-      `Datacube`, a KinMS cube, or real survey data alike.
+      `Datacube`, a KinMS cube, or real survey data alike. Ships with
+      `crop_to_line` (crop a cube to near a line before measuring moments)
+      and a built-in diagnostic warning for a spectral window that looks
+      implausibly wide relative to the line -- see
+      `notebooks/07_moment_window_width_caveat.ipynb` for why that matters.
 - [x] **Slit / grism backend**: slit mask geometry & placement, dispersion to a
       2-D spectrum, companion broadband image; handle slit losses & misalignment.
       `kino.instruments.slit.SlitSpectrograph.observe` -> `SlitObservation`

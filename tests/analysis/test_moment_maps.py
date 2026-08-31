@@ -1,9 +1,11 @@
+import warnings
+
 import astropy.units as u
 import numpy as np
 import pytest
 from astropy.constants import c as C_LIGHT
 
-from kino.analysis.moments import compute_moment_maps
+from kino.analysis.moments import compute_moment_maps, crop_to_line
 from kino.galaxy import DiscGalaxy
 from kino.instruments.base import LSF, PSF, Detector, Throughput
 from kino.instruments.ifu import IFU
@@ -194,3 +196,77 @@ class TestIFURoundTrip:
 
         assert np.allclose(moments.vlos, gal.v_sys, atol=0.5)
         assert np.allclose(moments.dispersion, gal.sigma0, rtol=0.1)
+
+
+class TestCropToLine:
+    def test_crops_to_requested_range(self):
+        cube = _gaussian_line_cube(v0=0.0, sigma=30.0, n_spec=301, v_range=1000.0)
+        cropped = crop_to_line(cube, center=0.0 * u.km / u.s, half_width=250.0 * u.km / u.s)
+        v = cropped.spectral_axis.to_value(u.km / u.s)
+        assert v.min() >= -250.0
+        assert v.max() <= 250.0
+        assert cropped.shape[0] < cube.shape[0]
+
+    def test_slices_variance_and_flux_consistently(self):
+        cube = _gaussian_line_cube(
+            v0=0.0, sigma=30.0, n_spec=301, v_range=1000.0, variance_level=25.0
+        )
+        cropped = crop_to_line(cube, center=0.0 * u.km / u.s, half_width=250.0 * u.km / u.s)
+        full_v = cube.spectral_axis.to_value(u.km / u.s)
+        keep = (full_v >= -250.0) & (full_v <= 250.0)
+        assert np.array_equal(cropped.flux, cube.flux[keep])
+        assert np.array_equal(cropped.variance, cube.variance[keep])
+
+    def test_preserves_other_cube_metadata(self):
+        cube = _gaussian_line_cube(v0=0.0, sigma=30.0, n_spec=301, v_range=1000.0)
+        cropped = crop_to_line(cube, center=0.0 * u.km / u.s, half_width=250.0 * u.km / u.s)
+        assert cropped.pixel_scale == cube.pixel_scale
+        assert cropped.redshift == cube.redshift
+        assert cropped.flux_unit == cube.flux_unit
+        assert cropped.spectral_kind == cube.spectral_kind
+
+    def test_raises_if_window_misses_the_cube_entirely(self):
+        cube = _gaussian_line_cube(v0=0.0, sigma=30.0, n_spec=301, v_range=1000.0)
+        with pytest.raises(ValueError):
+            crop_to_line(cube, center=5000.0 * u.km / u.s, half_width=10.0 * u.km / u.s)
+
+    def test_cropping_a_too_wide_window_recovers_good_moments(self):
+        # the same scenario the collapse-rate sweep in
+        # notebooks/07_moment_window_width_caveat.ipynb maps out: crop first,
+        # and the "too wide" failure disappears.
+        wide = _gaussian_line_cube(
+            v0=50.0, sigma=30.0, n_spec=3001, v_range=3000.0, variance_level=400.0
+        )
+        cropped = crop_to_line(wide, center=50.0 * u.km / u.s, half_width=240.0 * u.km / u.s)
+        m = compute_moment_maps(cropped, snr_threshold=0, subtract_background=True)
+        assert m.dispersion[0, 0] > 0
+        assert np.isclose(m.dispersion[0, 0], 30.0, rtol=0.3)
+
+
+class TestWindowWidthDiagnostic:
+    def test_warns_on_a_too_wide_window(self):
+        wide = _gaussian_line_cube(
+            v0=50.0, sigma=30.0, n_spec=3001, v_range=3000.0, variance_level=400.0
+        )
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            compute_moment_maps(wide, snr_threshold=0, subtract_background=True)
+        assert any(issubclass(w.category, UserWarning) for w in caught)
+
+    def test_does_not_warn_on_a_well_sized_window(self):
+        good = _gaussian_line_cube(
+            v0=50.0, sigma=30.0, n_spec=241, v_range=240.0, variance_level=400.0
+        )
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            compute_moment_maps(good, snr_threshold=0, subtract_background=True)
+        assert len(caught) == 0
+
+    def test_check_window_false_silences_it(self):
+        wide = _gaussian_line_cube(
+            v0=50.0, sigma=30.0, n_spec=3001, v_range=3000.0, variance_level=400.0
+        )
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            compute_moment_maps(wide, snr_threshold=0, subtract_background=True, check_window=False)
+        assert len(caught) == 0

@@ -166,7 +166,14 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   biases `dispersion` low, which collapses just as easily; there's a sweet
   spot, not just an upper bound. See the module docstring's "window width
   matters" section and `notebooks/07_moment_window_width_caveat.ipynb`
-  for a quantified sweep.
+  for a quantified sweep. Two mitigations: `crop_to_line(cube, center,
+  half_width)` crops a cube to near a line before you call
+  `compute_moment_maps`, and `compute_moment_maps(..., check_window=True)`
+  (the default) warns when the too-wide failure mode looks likely — it
+  does not detect too-narrow, which has no comparably robust automatic
+  signal. Pass `check_window=False` when deliberately exploring a bad
+  window (e.g. in a test or sweep) rather than suppressing the warning
+  globally.
 - **External-data readers (`kino.io.manga`, `kino.io.download`):** convert
   to KINO's conventions in the reader, not downstream (`TEST_DATA.md`
   Section 5) — but check each reader's own module docstring for which

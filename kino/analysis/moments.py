@@ -51,10 +51,23 @@ is. There is a sweet spot, not just an upper bound; see
 ``notebooks/07_moment_window_width_caveat.ipynb`` for a quantified sweep
 across window widths (collapse rate, recovered dispersion, and ``vlos``
 scatter for comparison) that maps it out on a synthetic line.
+
+Two mitigations follow directly from that finding: :func:`crop_to_line`
+makes the safe path (crop to near the line before measuring moments) the
+easy one, and :func:`compute_moment_maps` itself runs a cheap, cube-level
+diagnostic -- via ``check_window`` -- that warns when the spectral window
+looks implausibly wide relative to where the flux actually is, *before*
+handing back a `dispersion` map that may be silently full of clipped
+zeros. The diagnostic only catches the too-wide failure mode (the one that
+matches "hand it a full instrument bandpass by accident," the concrete
+trap in this repo's own fiducial configs -- see ``CLAUDE.md``); it does not
+detect a too-narrow window, which has no comparably robust, false-positive-free
+signal to check for automatically.
 """
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 
 import astropy.units as u
@@ -62,6 +75,16 @@ import numpy as np
 from astropy.constants import c as C_LIGHT
 
 from kino.io.base import Datacube
+
+#: Below this fraction of "effectively contributing" channels (see
+#: `_effective_channel_fraction`), `compute_moment_maps` warns that the
+#: window may be too wide. Calibrated empirically against
+#: `notebooks/07_moment_window_width_caveat.ipynb`'s sweep: comfortably
+#: separates its "sweet spot" windows (fraction >= 0.12, 0% dispersion
+#: collapse) from windows already well into collapse (fraction <= 0.09,
+#: >85% collapse). Not a universal constant -- a heuristic guideline, per
+#: this module's own "not a bug" framing of the underlying effect.
+_MIN_EFFECTIVE_CHANNEL_FRACTION = 0.1
 
 
 @dataclass
@@ -87,6 +110,75 @@ class MomentMaps:
     flux_unit: u.UnitBase
 
 
+def crop_to_line(cube: Datacube, center: u.Quantity, half_width: u.Quantity) -> Datacube:
+    """Crop ``cube``'s spectral axis to ``[center - half_width, center + half_width]``.
+
+    The safe-path counterpart to this module's window-width caveat: size
+    ``half_width`` to a handful of the line's expected total extent (Doppler
+    range across the field, plus a few line widths of margin) and crop
+    before calling :func:`compute_moment_maps`, rather than handing it an
+    instrument's full bandpass.
+
+    Parameters
+    ----------
+    cube : Datacube
+    center : Quantity
+        Line centre, in the same domain as ``cube.spectral_axis`` (a
+        wavelength for ``spectral_kind="wavelength"``, a velocity for
+        ``"velocity"``).
+    half_width : Quantity
+        Half-width of the retained window, same domain as ``center``.
+
+    Returns
+    -------
+    Datacube
+        A new ``Datacube`` with ``flux``/``variance``/``mask`` sliced to
+        match the cropped ``spectral_axis``. Assumes ``cube.spectral_axis``
+        is monotonically increasing (true of every cube produced elsewhere
+        in kino).
+    """
+    axis = cube.spectral_axis
+    lo, hi = center - half_width, center + half_width
+    in_window = (axis >= lo) & (axis <= hi)
+    if not np.any(in_window):
+        raise ValueError(
+            f"no channels of cube.spectral_axis (range {axis.min()}-{axis.max()}) "
+            f"fall within [{lo}, {hi}]"
+        )
+    idx = np.flatnonzero(in_window)
+    sl = slice(idx[0], idx[-1] + 1)
+    return Datacube(
+        flux=cube.flux[sl],
+        spectral_axis=axis[sl],
+        spectral_kind=cube.spectral_kind,
+        pixel_scale=cube.pixel_scale,
+        redshift=cube.redshift,
+        flux_unit=cube.flux_unit,
+        variance=cube.variance[sl] if cube.variance is not None else None,
+        mask=cube.mask[sl] if cube.mask is not None else None,
+        meta=dict(cube.meta),
+    )
+
+
+def _effective_channel_fraction(flux_cube: np.ndarray) -> tuple[float, float, int]:
+    """Fraction of channels "effectively" carrying the (stacked) spectrum's flux.
+
+    Stacks ``flux_cube`` over the spatial axes, subtracts a median
+    background, and computes the participation-ratio effective channel
+    count ``n_eff = (sum w)**2 / sum(w**2)`` -- large when a few channels
+    hold most of the (background-subtracted) flux, small when it's spread
+    thin (either a genuine broad/weak line, or -- the failure mode this
+    guards against -- a narrow line lost in a wide window of noise).
+    Returns ``(fraction, n_eff, n_total)``.
+    """
+    stacked = flux_cube.sum(axis=(1, 2))
+    n_total = stacked.shape[0]
+    w = stacked - np.median(stacked)
+    denom = np.sum(w**2)
+    n_eff = (np.sum(w) ** 2 / denom) if denom > 0 else 0.0
+    return n_eff / n_total, n_eff, n_total
+
+
 def compute_moment_maps(
     cube: Datacube,
     *,
@@ -95,6 +187,7 @@ def compute_moment_maps(
     lsf_sigma: u.Quantity | None = None,
     snr_threshold: float = 3.0,
     subtract_background: bool = True,
+    check_window: bool = True,
 ) -> MomentMaps:
     """Flux/Vlos/dispersion moment maps from ``cube``.
 
@@ -122,11 +215,33 @@ def compute_moment_maps(
         a roughly flat sky/dark pedestal occupying most of the band, e.g.
         ``kino.instruments.ifu.IFU``'s output; turn off for an
         already-background-subtracted cube).
+    check_window : bool, optional
+        Run the cheap, cube-level too-wide-window diagnostic described in
+        this module's docstring and emit a ``UserWarning`` if triggered.
+        Set ``False`` to silence it -- e.g. when deliberately exploring a
+        bad window (as `notebooks/07_moment_window_width_caveat.ipynb`
+        does), or once you've already sized the window with
+        :func:`crop_to_line` and don't need to be told twice.
 
     Returns
     -------
     MomentMaps
     """
+    if check_window:
+        fraction, n_eff, n_total = _effective_channel_fraction(cube.flux)
+        if fraction < _MIN_EFFECTIVE_CHANNEL_FRACTION:
+            warnings.warn(
+                f"compute_moment_maps: only {fraction:.1%} of the {n_total} spectral "
+                f"channels ({n_eff:.0f} effective) contribute to the stacked spectrum's "
+                "flux -- the spectral window may be too wide relative to the line. "
+                "dispersion is especially vulnerable to noise from the rest (see this "
+                "module's 'window width matters' docstring section). Consider "
+                "kino.analysis.moments.crop_to_line() first, or pass check_window=False "
+                "to silence this.",
+                UserWarning,
+                stacklevel=2,
+            )
+
     if cube.spectral_kind == "velocity":
         velocity = cube.spectral_axis.to(u.km / u.s)
     else:
