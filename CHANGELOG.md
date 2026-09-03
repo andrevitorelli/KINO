@@ -71,7 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
 - **Phase 6 (partial) — MaNGIA reader and downloader**: `kino.io.download.fetch_file`
   (generic download + sha256 verification, cached under a git-ignored `data/`
   dir) is implemented and tested against a local HTTP server. `kino.io.manga.read_mangia_cube`
-  parses a MaNGIA (TNG50 mock MaNGA, Sarmiento et al. 2022) FITS cube into a
+  parses a MaNGIA (TNG50 mock MaNGA, Sarmiento et al. 2023) FITS cube into a
   `Datacube`. **Both are unverified against a real MaNGIA file**: MaNGIA's
   premade cubes live on the IllustrisTNG data portal behind free user
   registration and a personal API key, which this session didn't have --
@@ -102,5 +102,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
   does not catch too-narrow, which has no comparably robust automatic
   signal). Calibrated against and demonstrated in
   `notebooks/07_moment_window_width_caveat.ipynb`.
+- **Phase 5 (partial) — IFU shear inference**: `kino.inference.likelihood.IFUMomentLikelihood`,
+  a `nautilus`-callable Gaussian log-likelihood over flux/Vlos/dispersion
+  moment maps (`kino.analysis.moments`). Each trial parameter set is
+  forward-modelled through the *same*, fixed `IFU.observe(..., rng=None)`
+  pipeline used for the data before reduction to moments, so PSF-driven beam
+  smearing cancels between model and data rather than biasing the fit; only
+  spaxels the data's own S/N mask judged trustworthy are compared.
+  `kino.inference.priors` wraps free parameters into a `nautilus.Prior`
+  (`build_prior`), including a `tully_fisher_prior` on `v_flat` (explicitly
+  a toy, uncalibrated relation -- `TOY_TF_ALPHA = 4.0`). `kino.inference.sampler.fit_shear`
+  is a thin `nautilus` nested-sampling wrapper returning a `Posterior`
+  (equal-weighted samples, percentile summary, `log_z`). Validated with a
+  real (small, fast) nested-sampling shear injection-recovery test in
+  `tests/inference/test_sampler.py`. **IFU only** -- no slit/grism
+  likelihood yet, and `notebooks/04_one_galaxy_inference.ipynb` still shows
+  an older, pre-Phase-3/5 aspirational API and needs a rewrite.
+
+### Fixed
+
+- Corrected the MaNGIA citation (Sarmiento et al. 2023, A&A 673, A23,
+  arXiv:2211.11790 -- not "2022") in report material and cross-checked
+  against the docstrings/changelog entries that reference it.
 
 [Unreleased]: https://github.com/andrevitorelli/KINO/compare/main...HEAD

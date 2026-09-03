@@ -3,7 +3,8 @@
 This file orients Claude Code (and any AI assistant) working in this repository.
 Read it before making changes. Keep it up to date as the project evolves.
 
-> **Status: Phase 0 done; Phases 1-3 done; Phase 6 io-layer and one
+> **Status: Phase 0 done; Phases 1-3 done; Phase 5's IFU likelihood done
+> (slit/grism likelihood deferred); Phase 6 io-layer and one
 > `kino.analysis` module started early.**
 > `pyproject.toml` and the `kino/` package skeleton exist and `pip install
 > -e ".[dev]"` / `ruff` / `pytest` work. Repo is git-initialised with an MIT
@@ -36,10 +37,20 @@ Read it before making changes. Keep it up to date as the project evolves.
 > https://www.tng-project.org/users/register/), so both were written from
 > documented file structure and tested against a synthetic stand-in cube
 > instead (`notebooks/06_mangia_datacube_demo.ipynb`); see both modules'
-> docstrings before trusting them against a real file. Phases 4-5
-> (mocks/inference) have not started, so `examples/`,
-> `notebooks/04_one_galaxy_inference.ipynb`, and the rest of `kino/analysis/`
-> are still placeholders that raise `NotImplementedError`.
+> docstrings before trusting them against a real file. `kino.inference`
+> (Phase 5: `IFUMomentLikelihood` -- a moment-map Gaussian likelihood that
+> forward-models each trial through the *same* `IFU` pipeline as the data
+> so PSF-driven beam smearing cancels rather than biasing the fit;
+> `kino.inference.priors.build_prior`/`tully_fisher_prior` wrapping
+> `nautilus.Prior`; `kino.inference.sampler.fit_shear`/`Posterior`, a thin
+> wrapper around `nautilus` nested sampling) is implemented and tested,
+> including a real (if deliberately small/fast) shear injection-recovery
+> test -- **IFU only**; a slit/grism likelihood is not yet built. Phase 4
+> (`kino.mocks`) has not started, so `examples/` and the rest of
+> `kino/analysis/` are still placeholders that raise `NotImplementedError`,
+> and `notebooks/04_one_galaxy_inference.ipynb` still shows an older,
+> aspirational API that predates the real Phase 3/5 implementations --
+> needs a rewrite before it's trustworthy as a demo.
 
 ## What KINO is
 
@@ -174,6 +185,28 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   signal. Pass `check_window=False` when deliberately exploring a bad
   window (e.g. in a test or sweep) rather than suppressing the warning
   globally.
+- **IFU shear likelihood (`kino.inference.likelihood.IFUMomentLikelihood`):**
+  compares flux/Vlos/dispersion **moment maps** (`kino.analysis.moments`),
+  not raw cube pixels. Every trial parameter set is forward-modelled through
+  the *same*, fixed `IFU.observe(..., rng=None)` pipeline used for the data
+  before being reduced to moments — never compare a rendered data cube's
+  moments against an analytically-evaluated (un-PSF-smeared) model, or the
+  fit is biased by exactly the beam-smearing amount. The data's own moment
+  maps are computed once (`check_window=True`, real `snr_threshold`) at
+  construction; each per-call model evaluation reuses `check_window=False`
+  and `snr_threshold=0` and is compared only over the spaxels the *data*'s
+  own S/N mask already judged trustworthy. `g1`/`g2`/`line_flux` are handled
+  by the likelihood itself, not passed to `DiscGalaxy` — any other free
+  parameter must be a `DiscGalaxy` constructor field
+  (`kino.inference.likelihood.GALAXY_FIELDS`). An unphysical trial point
+  (e.g. `|g| >= 1`) returns `-inf` rather than raising. `kino.inference.priors`
+  wraps this into a `nautilus.Prior` (`build_prior`), including an explicitly
+  **toy, uncalibrated** Tully-Fisher prior (`tully_fisher_prior`,
+  `TOY_TF_ALPHA = 4.0`) — do not read numeric results from it as
+  astrophysical predictions until it's replaced with a real calibration.
+  `kino.inference.sampler.fit_shear` is a thin `nautilus` nested-sampling
+  wrapper returning a `Posterior` (equal-weighted samples + `log_z`). No
+  slit/grism likelihood exists yet — only the IFU case is implemented.
 - **External-data readers (`kino.io.manga`, `kino.io.download`):** convert
   to KINO's conventions in the reader, not downstream (`TEST_DATA.md`
   Section 5) — but check each reader's own module docstring for which

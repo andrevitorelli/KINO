@@ -210,13 +210,36 @@ tests and a runnable example before the next begins.
 - [ ] Reproducibility: seeded RNG; regenerate identical mocks from a config.
 
 ### Phase 5 — Inference engine
-- [ ] Likelihood for the **IFU** case (fit model cube / moment maps to data).
+- [x] Likelihood for the **IFU** case (fit model cube / moment maps to data).
+      `kino.inference.likelihood.IFUMomentLikelihood` -- the "moment maps"
+      option the bullet names: forward-models each trial through the exact
+      same `IFU` + `compute_moment_maps` pipeline the data went through
+      (so PSF-driven beam smearing cancels between model and data rather
+      than biasing every fit), and compares Vlos/dispersion (optionally
+      flux) via a Gaussian chi-square using the data's own delta-method
+      uncertainties, only over spaxels its own S/N mask judged trustworthy.
 - [ ] Likelihood for the **slit/grism** case (fit 2-D spectrum + image jointly).
-- [ ] Priors module (Tully–Fisher prior on rotation, geometry priors).
-- [ ] Sampler wrapper: `nautilus` (neural-network-boosted importance nested
+      Deferred -- a distinct design (joint spatial + spectral fit) from the
+      IFU case above, not a small extension of it.
+- [x] Priors module (Tully–Fisher prior on rotation, geometry priors).
+      `kino.inference.priors`: `build_prior` wraps any `{name: (low, high)}`
+      or `{name: scipy.stats distribution}` into a `nautilus.Prior`, e.g.
+      for geometry parameters; `tully_fisher_prior` is an explicitly *toy*
+      (uncalibrated) log-normal prior on `v_flat` using the same power law
+      as `notebooks/03_tully_fisher_shear_signal.ipynb` -- no calibrated TF
+      relation exists in kino yet (see Phase 1's deferred consistency check).
+- [x] Sampler wrapper: `nautilus` (neural-network-boosted importance nested
       sampling), producing posterior samples and the Bayesian evidence.
-- [ ] Recover (g1, g2) posterior per galaxy; save chains + summary statistics.
-- [ ] Tests: injection–recovery on noiseless mocks recovers input shear.
+      `kino.inference.sampler.fit_shear` -> `Posterior` (equal-weighted
+      samples, `log_z`, `.summary()`).
+- [x] Recover (g1, g2) posterior per galaxy; save chains + summary statistics.
+      `Posterior.summary()` gives 16/50/84th-percentile credible intervals;
+      chain persistence to disk isn't wired up yet (natural Phase 4/6
+      provenance-layer follow-up, not implemented here).
+- [x] Tests: injection–recovery on noiseless mocks recovers input shear.
+      `tests/inference/test_sampler.py` runs a real `nautilus` fit (2 free
+      parameters, a small IFU grid) and confirms the recovered `(g1, g2)`
+      matches the injected truth.
 
 ### Phase 6 — Validation & forecasting
 See `TEST_DATA.md` for the full validation-data plan (the four-rung ladder:
