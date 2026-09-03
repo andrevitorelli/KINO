@@ -116,8 +116,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
   (equal-weighted samples, percentile summary, `log_z`). Validated with a
   real (small, fast) nested-sampling shear injection-recovery test in
   `tests/inference/test_sampler.py`. **IFU only** -- no slit/grism
-  likelihood yet, and `notebooks/04_one_galaxy_inference.ipynb` still shows
-  an older, pre-Phase-3/5 aspirational API and needs a rewrite.
+  likelihood yet.
+- `notebooks/04_one_galaxy_inference.ipynb` rewritten from its earlier
+  pre-Phase-3/5 aspirational scaffold to the real API: intrinsic
+  `DiscGalaxy` -> `apply_shear` -> `IFU.observe` (a narrowed spectral
+  window sized to the line, per the window-width caveat) -> moment maps
+  -> `IFUMomentLikelihood`/`build_prior`/`fit_shear`, plus a
+  `SlitSpectrograph` forward-model aside (no likelihood yet for that
+  backend). Executes end to end and recovers an injected shear alongside a
+  free inclination/`v_flat`, deliberately illustrating the
+  inclination-velocity degeneracy (`CLAUDE.md`) rather than hiding it by
+  fixing those parameters at their true values.
 
 ### Fixed
 

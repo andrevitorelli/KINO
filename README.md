@@ -285,9 +285,12 @@ summary level.
 - [ ] Cluster-background proof-of-concept scenario (O(1) bright galaxies).
 
 ### Phase 8 — Docs, examples, release
-- [ ] Tutorial notebooks in `notebooks/`: (1) simulate one galaxy, (2) run
-      inference, (3) forecast. `notebooks/04_one_galaxy_inference.ipynb` is the
-      main showcase and is scaffolded as a placeholder pending Phases 1–5.
+- [x] Tutorial notebooks in `notebooks/`: (1) simulate one galaxy, (2) run
+      inference. `notebooks/04_one_galaxy_inference.ipynb` is the main
+      showcase and now runs end to end against the real Phase 1-3/5 API
+      (galaxy -> shear -> IFU -> moment maps -> IFUMomentLikelihood ->
+      fit_shear), including a SlitSpectrograph forward-model aside. (3)
+      forecast still pending Phase 7.
 - [ ] API docs (Sphinx or mkdocs) + published site.
 - [ ] Worked examples for both instrument backends.
 - [ ] Versioned release (`v0.1.0`), Zenodo DOI, citation file.

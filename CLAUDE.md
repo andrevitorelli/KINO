@@ -47,10 +47,13 @@ Read it before making changes. Keep it up to date as the project evolves.
 > including a real (if deliberately small/fast) shear injection-recovery
 > test -- **IFU only**; a slit/grism likelihood is not yet built. Phase 4
 > (`kino.mocks`) has not started, so `examples/` and the rest of
-> `kino/analysis/` are still placeholders that raise `NotImplementedError`,
-> and `notebooks/04_one_galaxy_inference.ipynb` still shows an older,
-> aspirational API that predates the real Phase 3/5 implementations --
-> needs a rewrite before it's trustworthy as a demo.
+> `kino/analysis/` are still placeholders that raise `NotImplementedError`.
+> `notebooks/04_one_galaxy_inference.ipynb` has been rewritten against the
+> real Phase 1-3/5 API (galaxy -> shear -> `IFU.observe` -> moment maps ->
+> `IFUMomentLikelihood`/`fit_shear`) and executes end to end, recovering an
+> injected shear alongside a free inclination/`v_flat` -- deliberately
+> showing the shear posterior widened by the inclination-velocity
+> degeneracy rather than hiding it by fixing those parameters at truth.
 
 ## What KINO is
 
