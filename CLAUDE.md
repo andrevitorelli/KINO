@@ -45,7 +45,11 @@ Read it before making changes. Keep it up to date as the project evolves.
 > `nautilus.Prior`; `kino.inference.sampler.fit_shear`/`Posterior`, a thin
 > wrapper around `nautilus` nested sampling) is implemented and tested,
 > including a real (if deliberately small/fast) shear injection-recovery
-> test -- **IFU only**; a slit/grism likelihood is not yet built. Phase 4
+> test -- **IFU only**; a slit/grism likelihood is not yet built.
+> `kino.analysis.injection` (Phase 6: `recover_shear`/`run_injection`/
+> `summarize_trials` -- ensemble injection-recovery giving (m, c), residual
+> sigma_eps, null-test bias and pulls) exists and is unit-tested, but no
+> science-scale ensemble has been run yet. Phase 4
 > (`kino.mocks`) has not started, so `examples/` and the rest of
 > `kino/analysis/` are still placeholders that raise `NotImplementedError`.
 > `notebooks/04_one_galaxy_inference.ipynb` has been rewritten against the
@@ -210,6 +214,22 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   `kino.inference.sampler.fit_shear` is a thin `nautilus` nested-sampling
   wrapper returning a `Posterior` (equal-weighted samples + `log_z`). No
   slit/grism likelihood exists yet — only the IFU case is implemented.
+- **Injection-recovery (`kino.analysis.injection`):** injects into a
+  `DiscGalaxy`, never a `Datacube` (a cube is already an observation and
+  can't be re-sheared). Import it as `kino.analysis.injection`, not from
+  `kino.analysis` -- it depends on `kino.inference`, which depends on
+  `kino.analysis.moments`, so re-exporting it there is an import cycle.
+  Every trial gets its own child of one `SeedSequence` (noise + sampler
+  seed), so a run is reproducible from one `seed` and a trial's result
+  doesn't depend on ensemble size. Recovered shear is the posterior
+  *median*; with a finite uniform prior and weakly-constraining data it is
+  pulled toward the prior centre, so `m < 0` at low S/N is expected
+  shrinkage -- check `m` against S/N before reading it as a forward-model
+  bug. `sigma_eps` is the per-galaxy scatter of `g_rec - g_true`; the pull
+  std should be ~1 if the posterior widths are honest, and a pull far above
+  1 means the reported errors are too small (sampler settings too loose, or
+  the likelihood's delta-method errors are underestimated) -- do not quote
+  a forecast until it is ~1 at production `n_live`/`n_eff`.
 - **External-data readers (`kino.io.manga`, `kino.io.download`):** convert
   to KINO's conventions in the reader, not downstream (`TEST_DATA.md`
   Section 5) — but check each reader's own module docstring for which

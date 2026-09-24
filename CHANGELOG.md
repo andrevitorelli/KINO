@@ -127,6 +127,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
   free inclination/`v_flat`, deliberately illustrating the
   inclination-velocity degeneracy (`CLAUDE.md`) rather than hiding it by
   fixing those parameters at their true values.
+- **Phase 6 (partial) — injection-recovery machinery**: `kino.analysis.injection`
+  (`recover_shear`, `run_injection`, `summarize_trials`). Injects a known
+  shear into a `DiscGalaxy`, observes it through an `IFU` (one noisy
+  realisation), fits it with `fit_shear`, and reduces an ensemble to
+  multiplicative/additive bias `(m, c)`, residual `sigma_eps`, null-test mean
+  bias and pulls. Reproducible from a single seed via per-trial
+  `SeedSequence` children. **IFU only**; takes a `DiscGalaxy` rather than the
+  `Datacube` the original stub sketched (a cube can't be re-sheared). This is
+  the tooling only -- no science-scale ensemble has been run yet.
 
 ### Fixed
 

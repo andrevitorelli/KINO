@@ -263,10 +263,12 @@ summary level.
       manifest, `TEST_DATA.md` Section 4) is not yet usable — every entry's
       URL is a placeholder pending TNG-project API access to browse the
       catalogue and confirm real subhalo IDs; see that module's docstring.
-- [ ] `kino/analysis/injection.py`: known-shear injection-recovery on any
-      `Datacube`, reporting recovered (g1, g2), bias (m, c), residual σ_ε.
-      Blocked on Phases 2, 3, 5 (`kino.lensing`, `kino.instruments`,
-      `kino.inference`).
+- [x] `kino/analysis/injection.py`: known-shear injection-recovery, reporting
+      recovered (g1, g2), bias (m, c), residual σ_ε, null-test mean bias and
+      pulls (`recover_shear`, `run_injection`, `summarize_trials`). **IFU only,
+      and takes a `DiscGalaxy` rather than a `Datacube`** -- a cube is already
+      an observation and can't be re-sheared. This is the *machinery*: the
+      ensemble suites below have not been run yet.
 - [ ] `kino/analysis/model_compare.py`: rank lensed / unlensed / tidally
       disturbed models by `nautilus` evidence (TEST_DATA.md Section 3).
       Blocked on Phases 1, 5.
