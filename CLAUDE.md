@@ -258,8 +258,11 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   for **Paranal**, not Pachon (light pollution from La Serena and aerosols are
   absent); airglow is a whole-night, all-season average and scales with the
   10.7 cm solar flux, which **you must pass** (SkyCalc's own almanac has no
-  value after 2025-03) -- a wrong flux moves the airglow continuum by tens of
-  percent; moonlight is capped at airmass 2 and tapers to zero between a Moon
+  value after 2025-03); `kino.observing.solar` tabulates NOAA SWPC's *predicted*
+  monthly F10.7 through 2027-12 (retrieved 2026-09-26 -- refresh it, and prefer
+  observed values once a month has passed). Across NOAA's stated range for
+  2027A (96-134 s.f.u.) the mean airglow radiance changes by only ~10%, but a
+  flux far off (say 200 vs 100) moves the continuum by tens of percent; moonlight is capped at airmass 2 and tapers to zero between a Moon
   zenith distance of 80 deg and the horizon; wavelengths are **vacuum**, so
   compare with air wavelengths only after converting; our ecliptic longitude
   (relative to the Sun) differs from SkyCalc's almanac by ~4 deg for one

@@ -167,6 +167,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
   builds the library (git-ignored `data/skycalc/`). Cross-checked against CTIO dark-sky
   means and Krisciunas & Schaefer (1991); interpolation within ~12% of direct SkyCalc.
   The model is for Cerro Paranal, and the solar flux must be supplied.
+- `kino.observing.solar`: NOAA SWPC's predicted monthly 10.7 cm solar flux (with its
+  low/high range) for 2026-09 to 2027-12, retrieved 2026-09-26, so the airglow level
+  can be set for the semester being forecast. Across NOAA's 2027A range the mean airglow
+  radiance changes by only ~10%.
 
 ### Fixed
 

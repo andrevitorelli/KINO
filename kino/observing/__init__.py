@@ -33,8 +33,10 @@ from kino.observing.skymodel import (
     ifu_sky_electron_rate,
     sky_electron_rate,
 )
+from kino.observing.solar import NOAA_SWPC_F107_PREDICTION, solar_flux
 
 __all__ = [
+    "NOAA_SWPC_F107_PREDICTION",
     "CTIO_DARK_SKY",
     "SOAR",
     "MoonState",
@@ -55,6 +57,7 @@ __all__ = [
     "nanolamberts_from_mag",
     "night_window",
     "seeing_at",
+    "solar_flux",
     "sky_brightness_v",
     "sky_electron_rate",
     "target_track",
