@@ -243,9 +243,16 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   the topocentric Moon (lunar parallax is ~1 deg). Airmass is Kasten & Young
   (1989), finite at the horizon and `inf` below it. `seeing_at` is the plain
   Kolmogorov scaling (FWHM ~ X^0.6 lambda^-0.2) -- an approximation for
-  shaping a curve, not a per-image prediction. **Moonlit sky brightness,
-  airglow and extinction are not implemented**: until they are, an
-  instrument's `sky_electron_rate` is a placeholder and S/N is optimistic.
+  shaping a curve, not a per-image prediction. **Sky:** `kino.observing.sky`
+  is *V band only* -- Krisciunas & Schaefer (1991) scattered moonlight (8-23%
+  rms accuracy, worse near the horizon) on the CTIO dark-sky means of
+  Krisciunas et al. (2007), Table 6 (0.2 mag rms scatter, 10-50% within a night,
+  solar-cycle dependent in V and B). There is **no moon colour model, no airglow
+  line structure and no sky spectrum yet**, so an instrument's
+  `sky_electron_rate` is still a placeholder and S/N is still optimistic.
+  **Extinction:** `kino.observing.extinction` is the IRAF/CTIO mean curve
+  (Stone & Baldwin 1983; Baldwin & Stone 1984), measured at Tololo and assumed at
+  Pachon, with no per-night aerosol variation and no cloud.
 - **External-data readers (`kino.io.manga`, `kino.io.download`):** convert
   to KINO's conventions in the reader, not downstream (`TEST_DATA.md`
   Section 5) — but check each reader's own module docstring for which

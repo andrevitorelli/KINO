@@ -284,8 +284,10 @@ summary level.
       S/N vs. seeing. Done: site (SOAR, coordinates from Mamajek 2013), the dark
       window of a night, target airmass and parallactic angle, moon
       illumination/altitude/separation, and the Kolmogorov seeing scaling with
-      airmass and wavelength. **Not done**: moonlit sky brightness and airglow,
-      atmospheric extinction (both need verified models/site data), a
+      airmass and wavelength; V-band sky brightness (Krisciunas & Schaefer
+      1991 moonlight on CTIO dark-sky means); the CTIO mean extinction curve.
+      **Not done**: a moon colour model and sky *spectrum* (airglow lines), so
+      sky is not yet usable at arbitrary wavelengths; a
       `forecast(instrument, spectrum, coords, night, g)` entry point, date
       ranges, and batching over a candidate list.
 - [ ] GMTIFS-like forecast: AO PSF, 25–50 mas spaxels, 4″×2″ field, R≈5–10k,

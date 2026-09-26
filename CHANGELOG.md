@@ -153,6 +153,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
   dec = latitude, airmass symmetry about transit, parallactic angle sign flip,
   full/new moon illumination on known dates. Sky brightness, extinction, the
   `forecast` entry point and batching are not implemented yet.
+- **Observing conditions (sky and extinction)**: `kino.observing.sky` (V-band
+  moonlit sky brightness from Krisciunas & Schaefer 1991 on the CTIO dark-sky
+  means of Krisciunas et al. 2007; equations checked against the paper's text,
+  including that 21.587 mag/arcsec^2 = 79.0 nL, and against Gemini South's
+  published sky-background bins) and `kino.observing.extinction` (the CTIO mean
+  extinction curve from the IRAF table, 3200-10870 A). V band only: no moon
+  colour, no airglow lines, no sky spectrum yet.
 
 ### Fixed
 

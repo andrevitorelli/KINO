@@ -15,18 +15,35 @@ from kino.observing.conditions import (
     seeing_at,
     target_track,
 )
+from kino.observing.extinction import atmospheric_transmission, extinction_coefficient
 from kino.observing.night import Night, night_window
 from kino.observing.site import SOAR, Site
+from kino.observing.sky import (
+    CTIO_DARK_SKY,
+    dark_sky_brightness,
+    mag_from_nanolamberts,
+    moonlight_brightness,
+    nanolamberts_from_mag,
+    sky_brightness_v,
+)
 
 __all__ = [
+    "CTIO_DARK_SKY",
     "SOAR",
     "MoonState",
     "Night",
     "Site",
     "TargetTrack",
     "airmass_from_altitude",
+    "atmospheric_transmission",
+    "dark_sky_brightness",
+    "extinction_coefficient",
+    "mag_from_nanolamberts",
+    "moonlight_brightness",
     "moon_state",
+    "nanolamberts_from_mag",
     "night_window",
     "seeing_at",
+    "sky_brightness_v",
     "target_track",
 ]
