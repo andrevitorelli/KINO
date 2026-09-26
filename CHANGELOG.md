@@ -144,6 +144,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
   has no efficiency curve so the config stops at 7300 A (Halpha at z < 0.11),
   and every unverified field is listed in the file's header. Not yet suitable
   for quoting a forecast.
+- **Observing conditions (first part)**: new `kino.observing` package with a `Site`
+  (SOAR, from Mamajek 2013's GPS geodetic position), `night_window` (the dark
+  window of the night beginning on a calendar date), `target_track` (altitude,
+  Kasten-Young airmass, parallactic angle), `moon_state` (illumination, phase
+  angle, altitude, topocentric separation) and `seeing_at` (Kolmogorov scaling
+  with airmass and wavelength). Invariants tested: zenith transit at
+  dec = latitude, airmass symmetry about transit, parallactic angle sign flip,
+  full/new moon illumination on known dates. Sky brightness, extinction, the
+  `forecast` entry point and batching are not implemented yet.
 
 ### Fixed
 

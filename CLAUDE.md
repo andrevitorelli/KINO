@@ -230,6 +230,22 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   1 means the reported errors are too small (sampler settings too loose, or
   the likelihood's delta-method errors are underestimated) -- do not quote
   a forecast until it is ~1 at production `n_live`/`n_eff`.
+- **Observing conditions (`kino.observing`):** sits between a target and an
+  instrument backend and knows nothing about instruments. A night is *the
+  evening beginning on a local calendar date*, found from the site's mean
+  solar noon (no timezone handling), so a "night" straddles a UT date change.
+  Sites are only predefined once their coordinates are checked against a
+  primary source (`SOAR`: Mamajek 2013, arXiv:1210.1616, Table 6; the
+  height is *ellipsoidal*). Hour angle / parallactic angle use the target's
+  RA **of date** (`TETE`), not J2000 -- the difference is ~0.3 deg of hour
+  angle after 25 years of precession, which an earlier version got wrong.
+  Moon phase uses the geocentric Sun and Moon; altitude and separation use
+  the topocentric Moon (lunar parallax is ~1 deg). Airmass is Kasten & Young
+  (1989), finite at the horizon and `inf` below it. `seeing_at` is the plain
+  Kolmogorov scaling (FWHM ~ X^0.6 lambda^-0.2) -- an approximation for
+  shaping a curve, not a per-image prediction. **Moonlit sky brightness,
+  airglow and extinction are not implemented**: until they are, an
+  instrument's `sky_electron_rate` is a placeholder and S/N is optimistic.
 - **External-data readers (`kino.io.manga`, `kino.io.download`):** convert
   to KINO's conventions in the reader, not downstream (`TEST_DATA.md`
   Section 5) — but check each reader's own module docstring for which

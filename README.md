@@ -280,6 +280,14 @@ summary level.
 - [ ] Compare IFU vs. slit/grism performance on matched galaxy populations.
 
 ### Phase 7 — Instrument case studies
+- [ ] Observing-conditions layer (`kino.observing`), so a target + night gives
+      S/N vs. seeing. Done: site (SOAR, coordinates from Mamajek 2013), the dark
+      window of a night, target airmass and parallactic angle, moon
+      illumination/altitude/separation, and the Kolmogorov seeing scaling with
+      airmass and wavelength. **Not done**: moonlit sky brightness and airglow,
+      atmospheric extinction (both need verified models/site data), a
+      `forecast(instrument, spectrum, coords, night, g)` entry point, date
+      ranges, and batching over a candidate list.
 - [ ] GMTIFS-like forecast: AO PSF, 25–50 mas spaxels, 4″×2″ field, R≈5–10k,
       0.9–2.5 µm; Hα/[O III] kinematics of z≈0.4–1.5 background discs.
 - [ ] MANIFEST+GMACS-like forecast: fibre-IFU bundles / multi-slit, R≈2–5k,
