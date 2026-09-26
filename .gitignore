@@ -12,7 +12,7 @@ dist/
 .ipynb_checkpoints/
 
 # curated/downloaded test-data cache -- see TEST_DATA.md Section 4
-data/
+/data/
 
 # Windows/WSL zone-transfer artifacts
 *:Zone.Identifier
