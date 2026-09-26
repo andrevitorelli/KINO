@@ -193,11 +193,19 @@ class SkyLibrary:
             meta = json.loads((path / "meta.json").read_text())
         return cls(moon, airglow, zodi, meta)
 
+    @property
+    def wavelength_range(self) -> tuple[u.Quantity, u.Quantity]:
+        """Wavelength range every component covers, as ``(min, max)`` in nm."""
+        lo = max(self._moon_lam[0], self._glow_lam[0], self._zodi_lam[0])
+        hi = min(self._moon_lam[-1], self._glow_lam[-1], self._zodi_lam[-1])
+        return max(lo, _MIN_LAMBDA_NM) * u.nm, hi * u.nm
+
     # -- components (each on its native grid) ---------------------------------
 
     def _extinction_scale(self, lam_nm: np.ndarray, airmass: float) -> np.ndarray:
         """``10^(-0.4 k (X - 1))`` for components stored at airmass 1."""
-        k = extinction_coefficient(np.clip(lam_nm, _MIN_LAMBDA_NM, None) * u.nm)
+        # the CTIO table spans 320-1087 nm; hold its end values beyond that
+        k = extinction_coefficient(np.clip(lam_nm, _MIN_LAMBDA_NM, 1087.0) * u.nm)
         return 10.0 ** (-0.4 * k * (airmass - 1.0))
 
     def moonlight(self, c: SkyConditions) -> np.ndarray:

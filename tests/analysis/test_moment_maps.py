@@ -270,3 +270,105 @@ class TestWindowWidthDiagnostic:
             warnings.simplefilter("always")
             compute_moment_maps(wide, snr_threshold=0, subtract_background=True, check_window=False)
         assert len(caught) == 0
+
+
+class TestKnownBackground:
+    """The default median background is fragile when the line fills the window;
+    a *known* baseline is not. (Regression tests for a measured 4.6x
+    underestimate of ``dispersion_err``.)"""
+
+    # a line whose expected counts fill about half of a 20-channel window (Poisson noise)
+    EXPECTED = np.array(
+        [0, 0, 0, 0.4, 4.1, 30, 217.4, 1508.9, 7368.1, 21609.9, 36661.4, 35714.2,
+         19742.3, 6061.3, 1012.6, 92, 4.7, 0.2, 0, 0]
+    )  # fmt: skip
+
+    def _draws(self, n_draws, **kwargs):
+        rng = np.random.default_rng(0)
+        velocity = (np.arange(20) - 9.5) * 27.3 * u.km / u.s
+        out, errs = [], []
+        for _ in range(n_draws):
+            counts = rng.poisson(self.EXPECTED).astype(float)[:, None, None]
+            cube = Datacube(
+                flux=counts,
+                spectral_axis=velocity,
+                spectral_kind="velocity",
+                pixel_scale=0.1 * u.arcsec,
+                redshift=0.0,
+                flux_unit=u.electron,
+                variance=self.EXPECTED[:, None, None].copy(),
+            )
+            m = compute_moment_maps(cube, snr_threshold=0, check_window=False, **kwargs)
+            out.append(m.dispersion[0, 0])
+            errs.append(m.dispersion_err[0, 0])
+        return np.array(out), np.array(errs)
+
+    def test_known_baseline_gives_calibrated_dispersion_errors_in_a_narrow_window(self):
+        disp, err = self._draws(500, subtract_background=np.zeros((20, 1, 1)))
+        assert np.std(disp, ddof=1) / np.mean(err) == pytest.approx(1.0, rel=0.15)
+
+    def test_the_median_background_is_biased_and_its_errors_too_small_there(self):
+        """Documents the failure the known-baseline option exists to avoid."""
+        disp, err = self._draws(500)  # default: per-spaxel median
+        known, _ = self._draws(500, subtract_background=np.zeros((20, 1, 1)))
+        assert np.std(disp, ddof=1) / np.mean(err) > 2.0
+        assert abs(np.mean(disp) - np.mean(known)) > 1.0  # km/s: the median distorts the wings
+
+    def test_known_baseline_matches_the_median_for_a_flat_pedestal_in_a_wide_window(self):
+        cube = _gaussian_line_cube(background=40.0, variance_level=100.0, n_spec=241, v_range=900.0)
+        median = compute_moment_maps(cube, snr_threshold=0, check_window=False)
+        known = compute_moment_maps(
+            cube,
+            snr_threshold=0,
+            check_window=False,
+            subtract_background=np.full((241, 1, 1), 40.0),
+        )
+        assert known.vlos[0, 0] == pytest.approx(median.vlos[0, 0], abs=0.05)
+        assert known.dispersion[0, 0] == pytest.approx(median.dispersion[0, 0], abs=0.05)
+        assert known.flux[0, 0] == pytest.approx(median.flux[0, 0], rel=1e-3)
+
+    def test_false_means_the_cube_is_already_subtracted(self):
+        cube = _gaussian_line_cube(background=40.0)
+        no_sub = compute_moment_maps(cube, snr_threshold=0, subtract_background=False)
+        zeros = compute_moment_maps(
+            cube, snr_threshold=0, subtract_background=np.zeros((121, 1, 1))
+        )
+        assert no_sub.flux[0, 0] == pytest.approx(zeros.flux[0, 0])
+
+    def test_baseline_with_a_wrong_shape_raises(self):
+        cube = _gaussian_line_cube()
+        with pytest.raises(ValueError, match="broadcast"):
+            compute_moment_maps(cube, subtract_background=np.zeros((7, 1, 1)))
+
+
+class TestIFUBaseline:
+    def test_baseline_is_sky_plus_dark_over_the_whole_exposure(self):
+        ifu = IFU(
+            pixel_scale=0.1 * u.arcsec, nx=4, ny=4,
+            wavelength_min=1.099 * u.um, wavelength_max=1.101 * u.um, n_wave=10,
+            psf=PSF(seeing_fwhm=0.05 * u.arcsec), lsf=LSF(resolving_power=8000.0),
+            throughput=Throughput(wavelength=[1.0, 1.2] * u.um, transmission=[1.0, 1.0]),
+            aperture_diameter=10 * u.m,
+            detector=Detector(read_noise=2 * u.electron, dark_current=0.01 * u.electron / u.s),
+            exposure_time=100 * u.s, n_exposures=3, sky_electron_rate=0.5 * u.electron / u.s,
+        )  # fmt: skip
+        b = ifu.baseline_electrons()
+        assert b.shape == (10, 1, 1)
+        assert b == pytest.approx((0.5 + 0.01) * 300.0)
+
+    def test_baseline_is_the_noiseless_floor_of_an_empty_scene(self):
+        from kino.instruments.ifu import IFU as _IFU  # noqa: F401 -- readability
+
+        ifu = IFU(
+            pixel_scale=0.1 * u.arcsec, nx=4, ny=4,
+            wavelength_min=1.099 * u.um, wavelength_max=1.101 * u.um, n_wave=10,
+            psf=PSF(seeing_fwhm=0.05 * u.arcsec), lsf=LSF(resolving_power=8000.0),
+            throughput=Throughput(wavelength=[1.0, 1.2] * u.um, transmission=[1.0, 1.0]),
+            aperture_diameter=10 * u.m,
+            detector=Detector(read_noise=0 * u.electron, dark_current=0.02 * u.electron / u.s),
+            exposure_time=100 * u.s, sky_electron_rate=np.linspace(0.1, 0.5, 10) * u.electron / u.s,
+        )  # fmt: skip
+        gal = DiscGalaxy(r_e=0.1, inc=30.0, pa=0.0, v_flat=100.0, z=0.0, sigma0=20.0)
+        cube = ifu.observe(gal, line_flux=1e-40 * u.erg / u.s / u.cm**2, line_wavelength=1.1 * u.um)
+        floor = np.broadcast_to(ifu.baseline_electrons(), cube.flux.shape)
+        assert cube.flux == pytest.approx(floor, rel=1e-6)

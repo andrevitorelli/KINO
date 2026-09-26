@@ -162,6 +162,20 @@ class IFU(Instrument):
     def band_center(self) -> u.Quantity:
         return 0.5 * (self.wavelength_min + self.wavelength_max)
 
+    def baseline_electrons(self) -> np.ndarray:
+        """Expected sky + dark electrons per channel per spaxel over the whole
+        exposure, shape ``(n_wave, 1, 1)`` -- the *known* baseline that
+        ``observe`` adds under the line (before noise). Pass it as
+        ``subtract_background`` to :func:`kino.analysis.moments.compute_moment_maps`
+        to reduce a cube without estimating the background from the data.
+        """
+        exposure_total = self.exposure_time * self.n_exposures
+        sky = np.broadcast_to(
+            (self.sky_electron_rate * exposure_total).to_value(u.electron), (self.n_wave,)
+        )
+        dark = (self.detector.dark_current * exposure_total).to_value(u.electron)
+        return (sky + dark)[:, np.newaxis, np.newaxis]
+
     def _spatial_grid(self):
         ov = _SPATIAL_OVERSAMPLE
         pix_over = (self.pixel_scale / ov).to(u.arcsec)
@@ -247,14 +261,9 @@ class IFU(Instrument):
         signal_electron = photon_flux_to_electrons(
             flux_native, wave_centers, self.throughput, self.effective_area, exposure_total
         )
+        baseline = self.baseline_electrons()
 
-        sky_electron = np.broadcast_to(
-            (self.sky_electron_rate * exposure_total).to_value(u.electron),
-            (self.n_wave,),
-        )[:, np.newaxis, np.newaxis] * np.ones((1, self.ny, self.nx))
-        dark_electron = (self.detector.dark_current * exposure_total).to_value(u.electron)
-
-        expected = signal_electron + sky_electron + dark_electron
+        expected = signal_electron + baseline
         counts, variance = apply_shot_and_read_noise(
             expected, self.detector.read_noise, self.n_exposures, rng
         )

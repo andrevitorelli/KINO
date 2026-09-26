@@ -38,6 +38,11 @@ from kino.instruments.ifu import IFU
 from kino.io.base import Datacube
 from kino.lensing import apply_shear
 
+#: Voxel variances (electrons^2) are floored here in the cube likelihood: a voxel whose
+#: expected counts and read noise are both ~0 (a far wing of a noiseless test cube) carries no
+#: information, and 1/0 would poison the sum.
+VARIANCE_FLOOR = 1e-3
+
 #: DiscGalaxy constructor fields a likelihood may treat as free or fixed.
 GALAXY_FIELDS = (
     "r_e",
@@ -98,6 +103,14 @@ class IFUMomentLikelihood:
         Passed to the *data*'s own one-time moment-map reduction (not the
         per-call model one, see the module docstring); spaxels below this
         are excluded from the fit.
+    known_baseline : bool, optional
+        Subtract the instrument's *known* sky + dark baseline
+        (:meth:`~kino.instruments.ifu.IFU.baseline_electrons`) when reducing both
+        the data and every model cube, instead of estimating a per-spaxel median
+        from each. Default ``True``: the median is biased and its noise unpropagated
+        when the line fills much of the window (see ``compute_moment_maps``), which
+        made the reported errors up to ~4.6x too small. Set ``False`` only for data
+        whose baseline you cannot model.
     fit_flux : bool, optional
         Include the flux moment in the chi-square alongside Vlos and
         dispersion. Off by default -- flux is the moment most sensitive to
@@ -114,16 +127,19 @@ class IFUMomentLikelihood:
     lsf_sigma: u.Quantity | None = None
     snr_threshold: float = 3.0
     fit_flux: bool = False
+    known_baseline: bool = True
     data_moments: MomentMaps = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.line_flux_unit is None and self.fixed_line_flux is not None:
             self.line_flux_unit = self.fixed_line_flux.unit
+        self._background = self.ifu.baseline_electrons() if self.known_baseline else True
         self.data_moments = compute_moment_maps(
             self.data,
             line_wavelength=self.line_wavelength,
             lsf_sigma=self.lsf_sigma,
             snr_threshold=self.snr_threshold,
+            subtract_background=self._background,
             check_window=True,
         )
         if self.data_moments.mask is None:
@@ -180,6 +196,7 @@ class IFUMomentLikelihood:
             line_wavelength=self.line_wavelength,
             lsf_sigma=self.lsf_sigma,
             snr_threshold=0.0,
+            subtract_background=self._background,
             check_window=False,
         )
 
@@ -207,3 +224,83 @@ def _chi_square(data: np.ndarray, model: np.ndarray, err: np.ndarray, valid: np.
     resid = (data - model)[valid]
     sigma = err[valid]
     return float(np.sum((resid / sigma) ** 2))
+
+
+@dataclass
+class IFUCubeLikelihood:
+    """Voxel-level Gaussian log-likelihood of an IFU cube.
+
+    ``log L = -1/2 sum[(d - m)^2 / v + ln v]`` over every voxel.
+
+    Each trial parameter set is forward-modelled through the fixed ``ifu`` into the
+    expected cube ``m`` (sky + dark baseline included) and compared with the data
+    cube voxel by voxel, with ``v = m + read noise^2`` the expected variance (Poisson
+    source + sky + dark plus read noise, Gaussian-approximated). Nothing is
+    reduced to moments first, so -- unlike :class:`IFUMomentLikelihood` -- there is no
+    estimator noise bias: on many noise realisations the maximum-likelihood shear
+    was unbiased (to ~1e-4) and its scatter matched the Cramer-Rao bound
+    (:func:`kino.analysis.fisher.shear_fisher`, ``estimator="cube"``) at every S/N
+    tested, from per-spaxel S/N ~ 5 to ~100. It also uses the flux image and the
+    line wings that the moment maps discard.
+
+    Parameters are as for :class:`IFUMomentLikelihood`: ``g1``/``g2``/``line_flux``
+    handled here, any other free parameter a ``DiscGalaxy`` field.
+
+    Parameters
+    ----------
+    ifu : IFU
+        The fixed, known instrument the data was observed with.
+    line_wavelength : Quantity (wavelength)
+        Rest-frame line wavelength.
+    data : Datacube
+        The observed (or mock) cube; its ``flux`` must be in the same units as
+        ``ifu.observe`` returns (electrons).
+    fixed_galaxy_params, fixed_line_flux, line_flux_unit
+        As for :class:`IFUMomentLikelihood`.
+    """
+
+    ifu: IFU
+    line_wavelength: u.Quantity
+    data: Datacube
+    fixed_galaxy_params: dict = field(default_factory=dict)
+    fixed_line_flux: u.Quantity | None = None
+    line_flux_unit: u.UnitBase | None = None
+
+    def __post_init__(self) -> None:
+        if self.line_flux_unit is None and self.fixed_line_flux is not None:
+            self.line_flux_unit = self.fixed_line_flux.unit
+        expected = (self.ifu.n_wave, self.ifu.ny, self.ifu.nx)
+        if self.data.flux.shape != expected:
+            raise ValueError(
+                f"data cube shape {self.data.flux.shape} != the instrument's {expected}"
+            )
+        self._flux = np.asarray(self.data.flux, dtype=float)
+
+    def _build_scene(self, params: dict):
+        return IFUMomentLikelihood._build_scene(self, params)
+
+    def __call__(self, params: dict) -> float:
+        line_flux = params.get("line_flux")
+        if line_flux is None:
+            if self.fixed_line_flux is None:
+                raise ValueError("line_flux must be free (in params) or fixed_line_flux set")
+            line_flux = self.fixed_line_flux
+        elif not isinstance(line_flux, u.Quantity):
+            if self.line_flux_unit is None:
+                raise ValueError(
+                    "line_flux is free but line_flux_unit (or fixed_line_flux, to infer "
+                    "the unit from) was not set"
+                )
+            line_flux = line_flux * self.line_flux_unit
+        try:
+            scene = self._build_scene(params)
+            model = self.ifu.observe(
+                scene, line_flux=line_flux, line_wavelength=self.line_wavelength, rng=None
+            )
+        except ValueError:
+            return -np.inf
+        var = np.maximum(model.variance, VARIANCE_FLOOR)
+        chi2 = float(np.sum((self._flux - model.flux) ** 2 / var + np.log(var)))
+        if not np.isfinite(chi2):
+            return -np.inf
+        return -0.5 * chi2

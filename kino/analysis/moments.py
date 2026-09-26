@@ -52,6 +52,12 @@ is. There is a sweet spot, not just an upper bound; see
 across window widths (collapse rate, recovered dispersion, and ``vlos``
 scatter for comparison) that maps it out on a synthetic line.
 
+The default background estimate (a per-spaxel median over the window) adds
+its own failure at the narrow end: when the line fills more than roughly a
+third of the window, the median lands inside the line's wings and corrupts the
+moments and their error estimates (see ``subtract_background``). Pass the
+*known* baseline instead whenever you have one.
+
 Two mitigations follow directly from that finding: :func:`crop_to_line`
 makes the safe path (crop to near the line before measuring moments) the
 easy one, and :func:`compute_moment_maps` itself runs a cheap, cube-level
@@ -186,7 +192,7 @@ def compute_moment_maps(
     redshift: float | None = None,
     lsf_sigma: u.Quantity | None = None,
     snr_threshold: float = 3.0,
-    subtract_background: bool = True,
+    subtract_background: bool | np.ndarray = True,
     check_window: bool = True,
 ) -> MomentMaps:
     """Flux/Vlos/dispersion moment maps from ``cube``.
@@ -209,12 +215,21 @@ def compute_moment_maps(
     snr_threshold : float, optional
         Spaxels with flux significance below this are masked (``vlos``,
         ``dispersion`` -> NaN). Only applied if ``cube.variance`` is set.
-    subtract_background : bool, optional
-        Subtract a per-spaxel background estimated as the median flux
-        across the spectral axis before computing moments (appropriate for
-        a roughly flat sky/dark pedestal occupying most of the band, e.g.
-        ``kino.instruments.ifu.IFU``'s output; turn off for an
-        already-background-subtracted cube).
+    subtract_background : bool or array_like, optional
+        ``True`` (default): subtract a per-spaxel background estimated as the
+        median flux across the spectral axis (appropriate for a roughly flat
+        sky/dark pedestal occupying most of the band). **This estimator is
+        fragile**: if the line fills much more than a third of the spectral
+        window the median sits inside the line's wings, which biases the
+        moments (``dispersion`` above all) and adds noise that the propagated
+        errors do not include -- measured: ``dispersion_err`` 4.6x too small
+        when the line filled ~half of a 20-channel window. ``False``: the cube
+        is already background-subtracted. An **array** (broadcastable to
+        ``cube.flux``, e.g. shape ``(n_spec, 1, 1)``): a *known* baseline to
+        subtract -- what a forward model has, e.g.
+        :meth:`kino.instruments.ifu.IFU.baseline_electrons`. Nothing is
+        estimated from the data, so the errors stay calibrated at any window
+        width; this is what ``IFUMomentLikelihood`` and the forecast use.
     check_window : bool, optional
         Run the cheap, cube-level too-wide-window diagnostic described in
         this module's docstring and emit a ``UserWarning`` if triggered.
@@ -253,7 +268,17 @@ def compute_moment_maps(
     v = velocity.to_value(u.km / u.s)[:, np.newaxis, np.newaxis]
 
     flux_cube = cube.flux
-    background = np.median(flux_cube, axis=0, keepdims=True) if subtract_background else 0.0
+    if isinstance(subtract_background, bool | np.bool_):
+        background = np.median(flux_cube, axis=0, keepdims=True) if subtract_background else 0.0
+    else:
+        background = np.asarray(subtract_background, dtype=float)
+        try:
+            np.broadcast_shapes(background.shape, flux_cube.shape)
+        except ValueError as exc:
+            raise ValueError(
+                f"known background of shape {background.shape} does not broadcast "
+                f"to the cube {flux_cube.shape}"
+            ) from exc
     signal = flux_cube - background
 
     with np.errstate(invalid="ignore", divide="ignore"):

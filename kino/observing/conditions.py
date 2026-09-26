@@ -12,7 +12,14 @@ from dataclasses import dataclass
 
 import astropy.units as u
 import numpy as np
-from astropy.coordinates import TETE, AltAz, SkyCoord, get_body, get_sun
+from astropy.coordinates import (
+    TETE,
+    AltAz,
+    GeocentricTrueEcliptic,
+    SkyCoord,
+    get_body,
+    get_sun,
+)
 from astropy.coordinates.baseframe import NonRotationTransformationWarning
 from astropy.time import Time
 
@@ -163,3 +170,17 @@ def seeing_at(
         raise ValueError("seeing_ref must be positive")
     scale = x**0.6 * (u.Quantity(wavelength) / reference_wavelength).decompose().value ** -0.2
     return u.Quantity(seeing_ref).to(u.arcsec) * scale
+
+
+def ecliptic_from_sun(coord: SkyCoord, times: Time) -> tuple[u.Quantity, u.Quantity]:
+    """Target ecliptic longitude *relative to the Sun* (wrapped to +/-180 deg)
+    and ecliptic latitude, as the zodiacal-light model needs.
+
+    Geocentric true-of-date ecliptic. (SkyCalc's own almanac differed from this
+    by ~4 deg in longitude for one tested target; see ``kino.observing.skymodel``.)
+    """
+    frame = GeocentricTrueEcliptic(obstime=times)
+    target = coord.transform_to(frame)
+    sun = get_sun(times).transform_to(frame)
+    lon = ((target.lon - sun.lon + 180 * u.deg) % (360 * u.deg)) - 180 * u.deg
+    return lon.to(u.deg), target.lat.to(u.deg)

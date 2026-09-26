@@ -45,7 +45,7 @@ import astropy.units as u
 import numpy as np
 
 from kino.galaxy import DiscGalaxy
-from kino.inference.likelihood import GALAXY_FIELDS, IFUMomentLikelihood
+from kino.inference.likelihood import GALAXY_FIELDS, IFUCubeLikelihood, IFUMomentLikelihood
 from kino.inference.priors import build_prior
 from kino.inference.sampler import Posterior, fit_shear
 from kino.instruments.ifu import IFU
@@ -137,6 +137,7 @@ def recover_shear(
     rng: np.random.Generator | None = None,
     sampler_seed: int | None = None,
     snr_threshold: float = 3.0,
+    likelihood: str = "cube",
     n_live: int = 500,
     n_eff: float = 2000,
     keep_posterior: bool = False,
@@ -170,8 +171,13 @@ def recover_shear(
         Drives the data's noise realisation; ``None`` gives noiseless data.
     sampler_seed : int or None, optional
         Seed for ``nautilus``.
+    likelihood : {"cube", "moments"}, optional
+        ``"cube"`` (default): :class:`~kino.inference.likelihood.IFUCubeLikelihood`, unbiased.
+        ``"moments"``: :class:`~kino.inference.likelihood.IFUMomentLikelihood`, whose moment
+        estimator has a noise bias at low S/N (see ``CLAUDE.md``).
     snr_threshold, n_live, n_eff : optional
-        Forwarded to the likelihood / :func:`~kino.inference.sampler.fit_shear`.
+        ``snr_threshold`` is used by the moment likelihood only; the rest are forwarded
+        to :func:`~kino.inference.sampler.fit_shear`.
     keep_posterior : bool, optional
         Store the full :class:`~kino.inference.sampler.Posterior` on the trial.
 
@@ -189,14 +195,25 @@ def recover_shear(
         raise ValueError(f"free_priors may only name DiscGalaxy fields, got {bad}")
     fixed = {f: getattr(galaxy, f) for f in GALAXY_FIELDS if f not in extra_priors}
 
-    likelihood = IFUMomentLikelihood(
-        ifu=ifu,
-        line_wavelength=line_wavelength,
-        data=data,
-        fixed_galaxy_params=fixed,
-        fixed_line_flux=line_flux,
-        snr_threshold=snr_threshold,
-    )
+    if likelihood == "cube":
+        lik = IFUCubeLikelihood(
+            ifu=ifu,
+            line_wavelength=line_wavelength,
+            data=data,
+            fixed_galaxy_params=fixed,
+            fixed_line_flux=line_flux,
+        )
+    elif likelihood == "moments":
+        lik = IFUMomentLikelihood(
+            ifu=ifu,
+            line_wavelength=line_wavelength,
+            data=data,
+            fixed_galaxy_params=fixed,
+            fixed_line_flux=line_flux,
+            snr_threshold=snr_threshold,
+        )
+    else:
+        raise ValueError(f"likelihood must be 'cube' or 'moments', got {likelihood!r}")
     prior = build_prior(
         {
             "g1": (-shear_prior_range, shear_prior_range),
@@ -204,7 +221,7 @@ def recover_shear(
             **extra_priors,
         }
     )
-    posterior = fit_shear(prior, likelihood, n_live=n_live, seed=sampler_seed, n_eff=n_eff)
+    posterior = fit_shear(prior, lik, n_live=n_live, seed=sampler_seed, n_eff=n_eff)
 
     summary = posterior.summary()
     g_rec = (summary["g1"][0], summary["g2"][0])
