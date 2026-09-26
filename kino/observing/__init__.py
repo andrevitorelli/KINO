@@ -26,6 +26,13 @@ from kino.observing.sky import (
     nanolamberts_from_mag,
     sky_brightness_v,
 )
+from kino.observing.skymodel import (
+    SkyConditions,
+    SkyLibrary,
+    SkySpectrum,
+    ifu_sky_electron_rate,
+    sky_electron_rate,
+)
 
 __all__ = [
     "CTIO_DARK_SKY",
@@ -33,11 +40,15 @@ __all__ = [
     "MoonState",
     "Night",
     "Site",
+    "SkyConditions",
+    "SkyLibrary",
+    "SkySpectrum",
     "TargetTrack",
     "airmass_from_altitude",
     "atmospheric_transmission",
     "dark_sky_brightness",
     "extinction_coefficient",
+    "ifu_sky_electron_rate",
     "mag_from_nanolamberts",
     "moonlight_brightness",
     "moon_state",
@@ -45,5 +56,6 @@ __all__ = [
     "night_window",
     "seeing_at",
     "sky_brightness_v",
+    "sky_electron_rate",
     "target_track",
 ]

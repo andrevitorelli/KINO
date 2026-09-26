@@ -160,6 +160,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
   published sky-background bins) and `kino.observing.extinction` (the CTIO mean
   extinction curve from the IRAF table, 3200-10870 A). V band only: no moon
   colour, no airglow lines, no sky spectrum yet.
+- **Sky spectrum model**: `kino.observing.skymodel` (`SkyLibrary`, `SkyConditions`,
+  `SkySpectrum`, `sky_electron_rate`, `ifu_sky_electron_rate`) interpolates an offline
+  library of ESO SkyCalc spectra (moonlight, airglow, zodiacal light, starlight) and
+  converts them to per-channel detected electrons; `scripts/build_skycalc_library.py`
+  builds the library (git-ignored `data/skycalc/`). Cross-checked against CTIO dark-sky
+  means and Krisciunas & Schaefer (1991); interpolation within ~12% of direct SkyCalc.
+  The model is for Cerro Paranal, and the solar flux must be supplied.
 
 ### Fixed
 

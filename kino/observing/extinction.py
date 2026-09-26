@@ -50,7 +50,8 @@ def extinction_coefficient(wavelength: u.Quantity) -> np.ndarray:
     """
     wave = np.atleast_1d(u.Quantity(wavelength).to_value(u.angstrom)).astype(float)
     lo, hi = CTIO_WAVELENGTH_ANGSTROM[[0, -1]]
-    if np.any(wave < lo) or np.any(wave > hi):
+    tol = 1e-6  # Angstrom: unit-conversion round-off at the table edges
+    if np.any(wave < lo - tol) or np.any(wave > hi + tol):
         raise ValueError(f"wavelength outside the tabulated CTIO range {lo:.0f}-{hi:.0f} A")
     return np.interp(wave, CTIO_WAVELENGTH_ANGSTROM, CTIO_EXTINCTION_MAG_PER_AIRMASS)
 
