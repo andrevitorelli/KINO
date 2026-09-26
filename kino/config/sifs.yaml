@@ -1,0 +1,74 @@
+# SOAR Integral Field Spectrograph (SIFS) -- 0.30"/fibre mode, 700 l/mm "M" setup.
+#
+# Unlike gmtifs.yaml/gmacs.yaml (fiducial, representative values), the numbers
+# below come from NOIRLab's own SIFS page and are marked with their source.
+# ANYTHING NOT LISTED AS SOURCED IS A PLACEHOLDER -- see "UNVERIFIED" below.
+#
+# Sourced (https://noirlab.edu/science/programs/ctio/instruments/sifs/characteristics,
+# page dated Aug 2018 / updated Jun 2021 -- confirm current status with LNA,
+# instrument scientist Luciano Fraga):
+#   * 1300 microlens+fibres in a 50 x 26 array, 0.30"/fibre -> 15" x 7.8" field.
+#     (Only the 0.30" mode is stated as supported.)
+#   * 700 l/mm grating: 0.69 A/pix; "700M" covers 4500-7300 A; resolution
+#     R = 4200 at 5500 A (2 pixels) -> FWHM ~ 1.31 A, used below as a *constant*
+#     FWHM because the dispersion is constant in A/pix (so R grows ~ with lambda).
+#   * Detector e2v CCD231-84, 15 um pixels, read noise 3.9 e-, gain 2.0 e-/ADU.
+#   * Overall system efficiency, 700M, measured 2016-07-31 on two standard
+#     stars (EG 274, HR 7950). The figure is a plot only: the values below are
+#     the mean of the two curves DIGITISED BY EYE (about +/-0.5 percentage
+#     points), 4500-7300 A. It is not stated on the page whether atmosphere
+#     and telescope are included, so this is treated as end-to-end including
+#     the telescope, against the full 4.1 m circular area (no obstruction).
+#   * Each fibre projects to 1.9 pixels on the detector in both directions
+#     (substantial fibre-to-fibre crosstalk, corrected by masked flats).
+#
+# UNVERIFIED / PLACEHOLDER -- replace before quoting any forecast:
+#   * sky_electron_rate is 0 (NO SKY BACKGROUND). This flatters every S/N
+#     number a great deal. It needs a verified sky brightness for Cerro Pachon
+#     (moon phase dependent) converted to e-/s per fibre.
+#   * dark_current is 0 (not published on the pages read).
+#   * exposure_time / n_exposures are fiducial (the page's example is a single
+#     1200 s exposure), not a limit.
+#   * The 700R setting (5000-7800 A), needed for Halpha at z > 0.11, has
+#     resolution numbers on the page but NO published efficiency curve; this
+#     config therefore stops at 7300 A. Halpha is only reachable here at z < 0.11.
+#   * Fibre geometry is modelled as square 0.30" spaxels (real fibres are round,
+#     with crosstalk).
+#   * seeing_fwhm is a fiducial ~0.95": the median FWHM of SOAR speckle-camera
+#     images in 2024-2025 was reported as 0.954" (arXiv:2605.01487, "worse than
+#     typical"; individual run medians 0.83-1.35"). Sweep it, don't trust it.
+#
+# The wavelength window below is a narrow window at 6800-7000 A chosen only so
+# the config runs quickly (0.69 A/pix -> ~290 channels); the instrument's real
+# 700M coverage is 4500-7300 A. Override the window (as notebook 04 does) to
+# bracket the redshifted line of the target.
+
+pixel_scale: "0.30 arcsec"
+nx: 50
+ny: 26
+
+wavelength_min: "0.6800 um"
+wavelength_max: "0.7000 um"
+n_wave: 290                     # 200 A / 0.69 A per pixel
+
+lsf:
+  fwhm: "1.31 angstrom"         # 5500 A / R=4200
+
+psf:
+  seeing_fwhm: "0.95 arcsec"
+
+throughput:
+  wavelength: ["0.4500 um", "0.4930 um", "0.5500 um", "0.6000 um", "0.6500 um", "0.7000 um", "0.7300 um"]
+  transmission: [0.0815, 0.097, 0.088, 0.083, 0.074, 0.0595, 0.035]
+
+aperture_diameter: "4.1 m"
+obstruction_fraction: 0.0       # efficiency above is overall system, see header
+
+detector:
+  read_noise: "3.9 electron"
+  dark_current: "0 electron / s"    # PLACEHOLDER, see header
+
+exposure_time: "1200 s"
+n_exposures: 3                  # fiducial 1 hour total
+
+sky_electron_rate: "0 electron / s"   # PLACEHOLDER -- NO SKY, see header

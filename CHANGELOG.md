@@ -136,6 +136,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
   `SeedSequence` children. **IFU only**; takes a `DiscGalaxy` rather than the
   `Datacube` the original stub sketched (a cube can't be re-sheared). This is
   the tooling only -- no science-scale ensemble has been run yet.
+- `kino/config/sifs.yaml`: a SOAR SIFS (0.30"/fibre, 700 l/mm) config built from
+  NOIRLab's published numbers -- 50x26 fibres, 0.69 A/pix, R=4200 at 5500 A as
+  a constant 1.31 A FWHM, 3.9 e- read noise, 4.1 m aperture, and an overall
+  system efficiency digitised by eye from the published 700M curve. **Sky and
+  dark current are 0 placeholders** (no sourced values yet), the 700R setting
+  has no efficiency curve so the config stops at 7300 A (Halpha at z < 0.11),
+  and every unverified field is listed in the file's header. Not yet suitable
+  for quoting a forecast.
 
 ### Fixed
 
