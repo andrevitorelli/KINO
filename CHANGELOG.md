@@ -171,9 +171,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
   low/high range) for 2026-09 to 2027-12, retrieved 2026-09-26, so the airglow level
   can be set for the semester being forecast. Across NOAA's 2027A range the mean airglow
   radiance changes by only ~10%.
+- **Target-level shear forecast (IFU)**: `kino.analysis.fisher.shear_fisher` (a Fisher /
+  Cramer-Rao bound on `(g1, g2)` through the same forward model and moment maps as
+  `IFUMomentLikelihood`), `kino.analysis.forecast.forecast_ifu` (shear S/N against seeing
+  through a night, with moon, airmass, sky spectrum, extinction and seeing scaling per
+  time), `kino.io.spectrum` (strict-units ASCII/FITS spectrum reader and Gaussian
+  line-flux measurement with a checked error), `IFU.baseline_electrons`, and
+  `kino.observing.ecliptic_from_sun`. `scripts/validate_fisher_forecast.py` compares the
+  forecast with real injection-recovery ensembles.
+- **Cube-level likelihood and Fisher** (found by validating the moment version): `IFUCubeLikelihood`
+  (voxel-level Gaussian likelihood, unbiased) and `shear_fisher(estimator="cube")`, now the
+  default, with nuisance priors including Sersic n, `r_t` and the line flux, a `free=` subset,
+  and `psf_error=` (shear bias from a wrong assumed PSF, by a converged fit of the mis-specified
+  model). `forecast_ifu` gained `estimator`, `intrinsic_sigma` and `psf_error`.
+  `kino.analysis.injection` now defaults to the cube likelihood. The moment likelihood is kept
+  but documented as noise-biased: MLE ensembles measured ~1 sigma bias per galaxy at
+  per-spaxel S/N ~ 20 and 2-3.6x under-estimated scatter at S/N a few
+  (`scripts/validate_fisher_mle.py`, `notebooks/data/fisher_validation.json`).
+- Notebooks `08_observing_conditions`, `09_sky_spectrum` and `10_sifs_forecast`.
 
 ### Fixed
 
+- **`compute_moment_maps` background estimate** (found by validating the shear forecast
+  against injection-recovery): the default per-spaxel *median* background lands inside the
+  line's wings when the line fills much of the spectral window, biasing `dispersion` and
+  making `dispersion_err` up to 4.6x too small (a real ensemble had shear pulls of 3.3).
+  New: `subtract_background` accepts a *known* baseline array; `IFU.baseline_electrons()`
+  provides it; `IFUMomentLikelihood` (`known_baseline=True`, the default) and the Fisher
+  forecast now use it, and the errors match Monte Carlo to ~1% at any window width. This
+  changes the likelihood weighting: earlier shear-uncertainty estimates that used the
+  median background were too optimistic.
 - Corrected the MaNGIA citation (Sarmiento et al. 2023, A&A 673, A23,
   arXiv:2211.11790 -- not "2022") in report material and cross-checked
   against the docstrings/changelog entries that reference it.

@@ -58,6 +58,14 @@ Read it before making changes. Keep it up to date as the project evolves.
 > injected shear alongside a free inclination/`v_flat` -- deliberately
 > showing the shear posterior widened by the inclination-velocity
 > degeneracy rather than hiding it by fixing those parameters at truth.
+> A target-level forecast now exists end to end for the **IFU** case: spectrum
+> table -> line flux (`kino.io.spectrum`) -> night/moon/airmass/sky/extinction
+> (`kino.observing`) -> Fisher shear precision against seeing
+> (`kino.analysis.fisher`/`forecast`; the default cube-level estimator is unbiased and
+> validated, but is a *perfect-model statistical* bound, so pass an intrinsic floor), with
+> `kino/config/sifs.yaml` for SOAR SIFS (sky, dark current and the 700R efficiency are still
+> unverified; see the file's header). No slit/grism forecast, Goodman config or
+> near-infrared yet. Notebooks 08-10 showcase this work.
 
 ## What KINO is
 
@@ -191,29 +199,44 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   does not detect too-narrow, which has no comparably robust automatic
   signal. Pass `check_window=False` when deliberately exploring a bad
   window (e.g. in a test or sweep) rather than suppressing the warning
-  globally.
-- **IFU shear likelihood (`kino.inference.likelihood.IFUMomentLikelihood`):**
-  compares flux/Vlos/dispersion **moment maps** (`kino.analysis.moments`),
-  not raw cube pixels. Every trial parameter set is forward-modelled through
-  the *same*, fixed `IFU.observe(..., rng=None)` pipeline used for the data
-  before being reduced to moments — never compare a rendered data cube's
-  moments against an analytically-evaluated (un-PSF-smeared) model, or the
-  fit is biased by exactly the beam-smearing amount. The data's own moment
-  maps are computed once (`check_window=True`, real `snr_threshold`) at
-  construction; each per-call model evaluation reuses `check_window=False`
-  and `snr_threshold=0` and is compared only over the spaxels the *data*'s
-  own S/N mask already judged trustworthy. `g1`/`g2`/`line_flux` are handled
-  by the likelihood itself, not passed to `DiscGalaxy` — any other free
-  parameter must be a `DiscGalaxy` constructor field
-  (`kino.inference.likelihood.GALAXY_FIELDS`). An unphysical trial point
-  (e.g. `|g| >= 1`) returns `-inf` rather than raising. `kino.inference.priors`
-  wraps this into a `nautilus.Prior` (`build_prior`), including an explicitly
-  **toy, uncalibrated** Tully-Fisher prior (`tully_fisher_prior`,
-  `TOY_TF_ALPHA = 4.0`) — do not read numeric results from it as
-  astrophysical predictions until it's replaced with a real calibration.
-  `kino.inference.sampler.fit_shear` is a thin `nautilus` nested-sampling
-  wrapper returning a `Posterior` (equal-weighted samples + `log_z`). No
-  slit/grism likelihood exists yet — only the IFU case is implemented.
+  globally. **Background: prefer a known baseline over the default median.**
+  The default subtracts a per-spaxel *median over the window*, which is fragile:
+  when the line fills more than about a third of the window the median lands
+  inside the line's wings, biasing `dispersion` and adding noise the propagated
+  errors omit (measured: `dispersion_err` 4.6x too small at a 20-channel window
+  the line half-filled; a plain window-width diagnostic did *not* catch it).
+  Pass the instrument's known sky + dark baseline as `subtract_background`
+  (`IFU.baseline_electrons()`), which needs no estimate and stays calibrated to
+  ~1% against Monte Carlo at any window width. `IFUMomentLikelihood` and the
+  forecast do this by default (`known_baseline=True`).
+- **IFU shear likelihoods (`kino.inference.likelihood`):** two, sharing one forward model.
+  **`IFUCubeLikelihood` is the one to use**: a voxel-level Gaussian likelihood
+  `-1/2 sum[(d-m)^2/v + ln v]` (variance floored at 1e-3 e-^2 so zero-noise test cubes don't divide
+  by zero) with no estimator in between. On many noise realisations its maximum-likelihood shear
+  was unbiased (~1e-4) and its scatter matched the Cramer-Rao bound at every per-spaxel S/N tested
+  (5 to ~100), with inclination, PA and `v_flat` free as well. It needs *nonzero read noise* to be
+  a sensible Gaussian model. **`IFUMomentLikelihood`** compares flux/Vlos/dispersion *moment maps*
+  and is kept for comparison: data moments are ratios of noisy sums while the model's are
+  noiseless, so the estimator has a noise bias of ~1 sigma per galaxy at per-spaxel S/N ~ 20 that
+  grows toward low S/N (an analytic second-order correction was tried and fails below S/N ~ 12; a
+  moment-based fit of the notebook-04 mock missed the truth by 3-5 sigma in every parameter). Do
+  not use it for a stacked shear. Both forward-model each trial through the *same*, fixed
+  `IFU.observe(..., rng=None)` used for the data -- never compare a rendered cube against an
+  analytically-evaluated (un-PSF-smeared) model, or the fit is biased by exactly the beam-smearing
+  amount. For the moment version the data's moment maps are computed once (`check_window=True`,
+  real `snr_threshold`) and each model evaluation reuses `check_window=False`, `snr_threshold=0`,
+  compared over the spaxels the *data*'s own S/N mask judged trustworthy. `g1`/`g2`/`line_flux`
+  are handled by the likelihood, not passed to `DiscGalaxy`; any other free parameter must be a
+  `DiscGalaxy` field (`GALAXY_FIELDS`). An unphysical trial point (e.g. `|g| >= 1`) returns
+  `-inf`. `kino.inference.priors` wraps this into a `nautilus.Prior` (`build_prior`), including an
+  explicitly **toy, uncalibrated** Tully-Fisher prior (`tully_fisher_prior`, `TOY_TF_ALPHA = 4.0`)
+  -- do not read numeric results from it as astrophysical predictions until it is replaced with a
+  real calibration. `kino.inference.sampler.fit_shear` is a thin `nautilus` nested-sampling wrapper
+  returning a `Posterior` (equal-weighted samples + `log_z`). No slit/grism likelihood exists yet.
+  Validation lives in `scripts/validate_fisher_forecast.py` (nested sampling),
+  `scripts/validate_fisher_mle.py` (fast maximum-likelihood ensembles) and
+  `notebooks/data/fisher_validation.json`; a pull far from 1 means the reported errors, and every
+  forecast built on them, cannot be trusted.
 - **Injection-recovery (`kino.analysis.injection`):** injects into a
   `DiscGalaxy`, never a `Datacube` (a cube is already an observation and
   can't be re-sheared). Import it as `kino.analysis.injection`, not from
@@ -272,6 +295,36 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   **Extinction:** `kino.observing.extinction` is the IRAF/CTIO mean curve
   (Stone & Baldwin 1983; Baldwin & Stone 1984), measured at Tololo and assumed at
   Pachon, with no per-night aerosol variation and no cloud.
+- **Forecasts (`kino.analysis.fisher`, `kino.analysis.forecast`, `kino.io.spectrum`):**
+  `shear_fisher` is a Fisher/Cramer-Rao bound on `(g1, g2)` through the same forward model as the
+  likelihoods. **Default estimator `"cube"`**: the bound of `IFUCubeLikelihood` (every voxel, so
+  flux image + kinematics; the line flux is a nuisance with a fractional prior; central
+  differences; a few seconds). Validated against maximum-likelihood fits on many noise
+  realisations (scatter / Fisher 0.9-1.3 with inclination, PA and `v_flat` free; bias consistent
+  with zero). `"moments"` is the bound of the moment likelihood, kept for comparison. It returns
+  `sigma_fixed` (only the shear free) and `sigma_marginal` (nuisance parameters free under
+  `DEFAULT_CUBE_PRIORS`: inc +/-5 deg, pa +/-2 deg, r_e +/-5%, Sersic n +/-0.3, v_flat +/-25% (toy
+  TF), r_t +/-20%, centroid +/-0.05", sigma0 +/-20 km/s, line flux +/-5% -- *assumptions*, override
+  them). **What it is not:** a *statistical* bound for a perfect model. Because the data pin the
+  nuisance parameters far below any prior (inclination to ~0.1 deg), the marginal shear precision
+  comes out 1e-3-1e-2 per galaxy for bright targets -- **not achievable on real galaxies**, whose
+  non-circular motions, thickness, warps and PSF/model errors set a floor the bound ignores.
+  `forecast_ifu(..., intrinsic_sigma=...)` adds such a floor in quadrature (no default: it is a
+  scientific assumption; the README's published-forecast target is sigma_eps ~ 0.02-0.04) and
+  `psf_error=` adds the shear bias from a wrong assumed PSF FWHM (the converged
+  Levenberg-Marquardt fit of the mis-specified model, not the linear formula, which is 2-3x off at
+  high S/N). `forecast_ifu` tiles this over `(time, seeing)` through a night: airmass, the sky
+  spectrum (`kino.observing.skymodel`), CTIO extinction on the line flux (off with
+  `include_extinction=False` if the throughput already includes the atmosphere), and the quoted
+  500 nm/zenith seeing converted to the line's wavelength and airmass; the spectral window is
+  cropped to +/-`window_kms` (default 500) at the instrument's native dispersion. Limits: optical
+  only (sky library to 1 micron, extinction to 1.087 micron), IFU only, per galaxy (stack by
+  sqrt(N) only for the statistical part), and the Gaussian cube model needs nonzero read noise.
+  `kino.io.spectrum.read_spectrum` is strict about units -- a flux column with no unit raises
+  rather than assuming SDSS/DESI's 1e-17 -- and treats wavelengths as vacuum;
+  `measure_line_flux` returns what the *aperture* collected (pass `aperture_correction` for the
+  whole galaxy) with an error whose pull was checked to be ~1. Candidate target lists are private:
+  never commit one or use a real target name in code, tests, notebooks or reports.
 - **External-data readers (`kino.io.manga`, `kino.io.download`):** convert
   to KINO's conventions in the reader, not downstream (`TEST_DATA.md`
   Section 5) — but check each reader's own module docstring for which
@@ -320,6 +373,9 @@ python examples/run_inference.py       --config config/gmtifs.yaml
 
 # notebooks (needs the `notebooks` extra: pip install -e ".[notebooks]")
 jupyter lab notebooks/
+
+# sky library for kino.observing.skymodel / notebooks 09-10 (network, ~7 min, needs the `sky` extra)
+pip install -e ".[sky]" && python scripts/build_skycalc_library.py
 ```
 
 ## Definition of done (per change)
