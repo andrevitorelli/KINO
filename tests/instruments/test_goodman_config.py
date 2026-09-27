@@ -29,15 +29,22 @@ class TestGoodmanConfig:
         width = (s.wavelength_max - s.wavelength_min) / s.n_wave
         assert width.to_value(u.angstrom) == pytest.approx(0.42, rel=0.02)
 
-    def test_throughput_is_the_documented_sifs_derived_fiducial(self):
-        """Pins the derivation: SIFS's peak transmission (0.097, at 493 nm) divided
-        by 0.275 (midpoint of NOIRLab's "SIFS is 25-30% of Goodman's efficiency"
-        statement). If this ever changes, it should be because a *real* curve
-        replaced the fiducial one, not silently."""
+    def test_throughput_is_the_measured_eg21_derived_curve(self):
+        """Pins the values scripts/derive_goodman_throughput.py prints (from a real
+        on-sky EG 21 standard-star exposure, 400 l/mm grating). If this ever
+        changes, it should be because a better measurement replaced it (e.g. the
+        correct 930 l/mm grating, or a less noisy/multi-night reduction), not
+        silently."""
         s = SlitSpectrograph.from_config(CONFIG)
-        peak = float(np.max(s.throughput.transmission))
-        assert peak == pytest.approx(0.097 / 0.275, rel=1e-3)
-        assert np.all((s.throughput.transmission > 0) & (s.throughput.transmission < 0.6))
+        tp = s.throughput.transmission
+        peak = float(np.max(tp))
+        assert peak == pytest.approx(0.286, abs=0.001)  # ~505 nm
+        assert np.all((tp > 0) & (tp < 0.6))
+        # blue-peaked, declining toward the red -- the real curve's shape
+        assert tp[0] < peak
+        peak_i = int(np.argmax(tp))
+        assert tp[-1] < tp[peak_i]
+        assert np.all(np.diff(tp[peak_i:]) <= 0)  # monotonically falling redward of the peak
 
     def test_placeholder_sky_and_dark_are_still_placeholders(self):
         """Pins the fact that sky/dark are unverified: update this test on purpose

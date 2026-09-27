@@ -336,13 +336,21 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   unlike the fully-fiducial Phase 7 concept configs (`gmtifs.yaml`, `gmacs.yaml`), these use
   *real* SOAR geometry/detector numbers where published, and mark every unsourced field in the
   file's own header rather than silently defaulting. `goodman.yaml`'s throughput curve is a
-  worked example of that: NOIRLab's Goodman red-camera efficiency is unpublished, so the curve
-  is SIFS's own (also digitised-by-eye) efficiency divided by 0.275 -- the midpoint of NOIRLab's
-  "SIFS is 25-30% of Goodman's efficiency at similar resolution" statement -- not a blind guess,
-  but not a measurement either; `tests/instruments/test_goodman_config.py` pins the exact
-  derivation so a real curve replacing it is a deliberate, visible change. Before adding another
-  such config, look for the real number first; only fall back to a documented, derived fiducial
-  when none exists.
+  worked example of that: NOIRLab's Goodman red-camera efficiency is unpublished, so
+  `scripts/derive_goodman_throughput.py` derives a **real, measured** curve instead of a
+  cross-instrument guess (an earlier version of this file used SIFS's curve scaled by a stated
+  efficiency ratio -- see git history): NOIRLab publishes an on-sky exposure (raw frame, 1-D
+  counts spectrum, and the full FITS header) of the spectrophotometric standard EG 21, which
+  combined with EG 21's independently published absolute flux and KINO's own extinction/PSF
+  slit-loss models gives a system throughput. Caveat: it is the 400 l/mm grating, not the 930
+  l/mm `goodman.yaml` uses for resolution, and one star on one night (NOIRLab's own page notes
+  ~50% night-to-night scatter); a published 930/1200 l/mm curve exists only for the *blue*
+  camera and is used as a shape/magnitude cross-check, not a substitute. See the script's and
+  the config's own docstrings for the full derivation and caveats.
+  `tests/instruments/test_goodman_config.py` pins the exact values so a better measurement
+  replacing them is a deliberate, visible change. Before adding another such config, look for
+  the real number first; prefer a *measured proxy* (as here) over a cross-instrument guess, and
+  fall back to a documented fiducial only when neither exists.
 - **External-data readers (`kino.io.manga`, `kino.io.download`):** convert
   to KINO's conventions in the reader, not downstream (`TEST_DATA.md`
   Section 5) — but check each reader's own module docstring for which

@@ -6,31 +6,46 @@
 # concept design on a 24.5 m GMT aperture), the geometry, detector and
 # grating numbers below are SOURCED from NOIRLab's own Goodman pages
 # (see kino_status_report_2026-09-26.tex / the KINO 2026-09-26 Status Report
-# in the Obsidian vault for the full citation list). The one number that is
-# NOT sourced -- and the reason this file exists separately from an
-# eventual "verified" Goodman config -- is the throughput curve.
+# in the Obsidian vault for the full citation list).
 #
-# THROUGHPUT IS A DERIVED FIDUCIAL, NOT A MEASUREMENT.
+# THROUGHPUT IS A REAL MEASUREMENT, WITH A GRATING MISMATCH.
 # NOIRLab's Goodman red-camera page states its throughput "results will be
-# posted soon" (checked 2026-09; still unpublished as of 2026-09-27). No
-# other public efficiency curve for the red camera + 930 l/mm setup was
-# found. Rather than guess blind, this curve is the SIFS 700M efficiency
-# curve (kino/config/sifs.yaml, itself digitised by eye from a 2016 plot)
-# divided by 0.275 -- the midpoint of the "SIFS is roughly 25-30% of
-# Goodman's efficiency at similar resolution" statement on NOIRLab's SIFS
-# page -- and extended with a plausible taper toward the UV cutoff (~320 nm)
-# and the red CCD QE rolloff (~900 nm). Treat every number here as +/-50%
-# at best until a real throughput curve is available; ask LNA/SOAR staff,
-# or re-derive from an on-sky standard-star exposure if one becomes
-# available. See kino/config/sifs.yaml's own header for the SIFS-side
-# caveats this inherits.
+# posted soon" (still true as of 2026-09-27) and no published red-camera
+# efficiency curve exists for any grating. Rather than guess (an earlier
+# version of this file scaled SIFS's own curve by a stated efficiency
+# ratio -- see git history), scripts/derive_goodman_throughput.py derives
+# a real system throughput from an actual on-sky NOIRLab exposure of the
+# spectrophotometric standard EG 21: the RED camera, 400 l/mm grating
+# (mode M1), 1.0" slit, airmass 1.41 and 0.77" seeing (all read from the
+# FITS header, not assumed), combined with EG 21's independently published
+# absolute flux (IRAF/CTIO "ctionewcal" table) and KINO's own extinction
+# and PSF/slit-loss models. The numbers below are that script's output.
+#
+# Caveats (see the script's own docstring for the full list):
+#   * WRONG GRATING -- this is 400 l/mm, not the 930 l/mm used below for
+#     `lsf`. NOIRLab separately publishes a measured 930/1200 l/mm curve
+#     for the *blue* camera (peak ~0.30-0.38, blue-peaked, declining
+#     redward -- https://noirlab.edu/science/programs/ctio/instruments/goodman-high-throughput-spectrograph/instrument-characteristics/blue-camera-throughput),
+#     which agrees with the derived curve here in shape and magnitude and
+#     is the best cross-check available; there is no published 930 l/mm
+#     RED-camera curve to compare against directly.
+#   * ONE STAR, ONE NIGHT -- NOIRLab's own page notes total counts for the
+#     same object/setup vary ~50% night to night (clouds, lunar
+#     phase/distance); treat the normalisation as uncertain at that level.
+#   * The slit-loss and extinction corrections are KINO's own models
+#     (chosen for consistency with how SlitSpectrograph itself renders a
+#     mock), not independently verified against this specific observation.
+# Treat this as a real anchor, not a certified calibration, until a
+# genuine 930 l/mm red-camera standard-star reduction is available.
 #
 # Geometry: the slit is a single-object aperture within the fixed
 # complement of long slits (0.45-10.2 arcsec); 1.0 arcsec is chosen as a
-# seeing-limited-typical width. Slit LENGTH here (15 arcsec, n_spatial=100)
-# follows the same convention kino/config/gmacs.yaml set for a *per-target*
-# single slit -- not the full 3.9 arcmin the physical long slits span,
-# which matters for a MOS mask, not a single galaxy's spectrum.
+# seeing-limited-typical width (and matches the EG 21 exposure the
+# throughput above was derived from). Slit LENGTH here (15 arcsec,
+# n_spatial=100) follows the same convention kino/config/gmacs.yaml set
+# for a *per-target* single slit -- not the full 3.9 arcmin the physical
+# long slits span, which matters for a MOS mask, not a single galaxy's
+# spectrum.
 #
 # Spectral resolution: the 930 l/mm grating gives R=4450 (0.42 A/pix) at
 # 550 nm with NOIRLab's reference 0.46 arcsec slit; set as `lsf` below (a
@@ -61,9 +76,11 @@ psf:
   # defocus, coma*, astig*, trefoil*, spher default to 0.0 (unaberrated optics)
 
 throughput:
-  # FIDUCIAL, derived from SIFS's curve / 0.275 -- see header. Not a measurement.
-  wavelength: ["0.32 um", "0.40 um", "0.45 um", "0.493 um", "0.55 um", "0.60 um", "0.65 um", "0.70 um", "0.73 um", "0.80 um", "0.90 um"]
-  transmission: [0.10, 0.22, 0.296, 0.353, 0.320, 0.302, 0.269, 0.216, 0.127, 0.090, 0.040]
+  # REAL, from an on-sky EG 21 standard-star exposure -- 400 l/mm grating
+  # (not 930), one star, one night. See scripts/derive_goodman_throughput.py
+  # and the header above for the derivation and its caveats.
+  wavelength: ["0.385 um", "0.415 um", "0.445 um", "0.475 um", "0.505 um", "0.535 um", "0.565 um", "0.595 um", "0.625 um", "0.655 um", "0.685 um"]
+  transmission: [0.152, 0.284, 0.278, 0.274, 0.286, 0.278, 0.260, 0.239, 0.208, 0.179, 0.160]
 
 aperture_diameter: "4.1 m"      # SOAR
 obstruction_fraction: 0.0       # already netted into throughput/effective diameter above
