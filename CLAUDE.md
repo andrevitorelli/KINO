@@ -70,7 +70,14 @@ Read it before making changes. Keep it up to date as the project evolves.
 > see the file's header for its own caveats). `SlitCubeLikelihood`
 > (`kino.inference`) is the slit analogue of `IFUCubeLikelihood`; there is no slit moment-map
 > likelihood (the moment one stays IFU-only) and no near-infrared. Notebooks 08-10 showcase
-> the IFU side; there is no slit-forecast notebook yet.
+> the IFU side; `notebooks/11_goodman_forecast.ipynb` showcases the slit side, using a real
+> SDSS DR17 H-alpha spectrum (cross-validated against the MPA-JHU catalogue to <1%) and a
+> shear range derived from a fiducial 1e14 Msun foreground cluster (Evrard et al. 2008
+> M-sigma relation + a singular-isothermal-sphere shear estimate) rather than one fiducial
+> value -- and finds, for that specific target (r_e=2.6" against a 1.0" slit), that the
+> per-exposure shear S/N is slit-loss-limited (stat S/N below ~3 across the whole range) and
+> that a 10% PSF-FWHM error biases the shear more than either the statistical error or the
+> assumed 0.03 floor -- a real result, not generalisable to Goodman/KL as such.
 
 ## What KINO is
 

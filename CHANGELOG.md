@@ -30,6 +30,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
   own extinction/PSF slit-loss models, cross-checked in shape and magnitude against NOIRLab's
   published blue-camera 930/1200 l/mm curve. `tests/instruments/test_goodman_config.py` pins
   the measured values.
+- **`notebooks/11_goodman_forecast.ipynb`**: the slit analogue of `10_sifs_forecast.ipynb`, using
+  a real archival spectrum and a physically derived shear range instead of synthetic/fiducial
+  ones. A real SDSS DR17 H-alpha spectrum (found via a SkyServer SQL query for a strong,
+  high-S/N, southern-declination emitter) is read with `kino.io.spectrum`, its line
+  independently re-measured and cross-checked against the MPA-JHU catalogue (<1% agreement),
+  and aperture-corrected to a whole-galaxy flux via the Hopkins et al. (2003) photometric
+  prescription (cross-checked against a Sersic-profile enclosed-light-fraction estimate,
+  agreeing to ~10%). The shear sweep spans the range implied by a fiducial 1e14 Msun foreground
+  cluster (Evrard et al. 2008 M-sigma relation + a singular-isothermal-sphere shear profile) at
+  projected radii of 100 kpc-2 Mpc, rather than one fiducial `g` value. Finds that for this
+  specific target (r_e=2.6" against Goodman's 1.0" slit) the per-exposure shear S/N is
+  slit-loss-limited (statistical S/N below ~3 across the whole shear range) and that a 10%
+  PSF-FWHM error biases the shear more than either the statistical error or the assumed 0.03
+  intrinsic floor -- a genuine, target-specific result, not evidence about Goodman/KL in
+  general. Includes SDSS spectrum FITS (`notebooks/data/sdss_j2208_2878-54465-0462.fits`) for
+  reproducibility.
 
 - **Phase 0 — project setup**: git repository initialised; MIT `LICENSE`;
   GitHub Actions CI (lint + test matrix, Python 3.10-3.12); pre-commit config;

@@ -300,16 +300,18 @@ summary level.
       (`kino.analysis.fisher`), with a PSF-mismatch error budget and unbiased voxel-level
       likelihoods (`IFUCubeLikelihood`, `SlitCubeLikelihood`), and `forecast_ifu`/
       `forecast_slit` -- shear S/N against seeing through a night
-      (`notebooks/10_sifs_forecast.ipynb` for the IFU; no slit-forecast notebook yet).
+      (`notebooks/10_sifs_forecast.ipynb` for the IFU; `notebooks/11_goodman_forecast.ipynb`
+      for the slit, using a real SDSS DR17 H-alpha spectrum and a shear range derived from a
+      1e14 Msun foreground cluster via the Evrard et al. 2008 M-sigma relation and an SIS
+      lensing estimate).
       The primary forecast is the idealised, statistical S/N (no default intrinsic floor:
       real-galaxy calibration of one is out of scope for now, a future project's problem,
       not this pipeline's -- an `intrinsic_sigma` sensitivity comparison remains available).
       `kino/config/goodman.yaml` gives SOAR Goodman real geometry/detector numbers with a
       throughput derived from a real on-sky standard-star measurement (see the file's own
-      caveats -- wrong grating, one star one night). **Not done**: a slit-forecast showcase
-      notebook, date ranges and batching over a private candidate list, Cerro Pachon
-      corrections to the Paranal sky model, and the near-infrared (sky library ends at 1
-      micron).
+      caveats -- wrong grating, one star one night). **Not done**: date ranges and batching
+      over a private candidate list, Cerro Pachon corrections to the Paranal sky model, and
+      the near-infrared (sky library ends at 1 micron).
 - [ ] GMTIFS-like forecast: AO PSF, 25–50 mas spaxels, 4″×2″ field, R≈5–10k,
       0.9–2.5 µm; Hα/[O III] kinematics of z≈0.4–1.5 background discs.
 - [ ] MANIFEST+GMACS-like forecast: fibre-IFU bundles / multi-slit, R≈2–5k,
