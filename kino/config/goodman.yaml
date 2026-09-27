@@ -1,0 +1,78 @@
+# SOAR Goodman High Throughput Spectrograph (red camera), single slit,
+# 930 l/mm grating -- one slitlet of a real instrument (single-slit only:
+# kino.instruments.slit.SlitSpectrograph models one slit, not a MOS mask).
+#
+# UNLIKE kino/config/gmacs.yaml (a fully fiducial "GMACS-like" Phase 7
+# concept design on a 24.5 m GMT aperture), the geometry, detector and
+# grating numbers below are SOURCED from NOIRLab's own Goodman pages
+# (see kino_status_report_2026-09-26.tex / the KINO 2026-09-26 Status Report
+# in the Obsidian vault for the full citation list). The one number that is
+# NOT sourced -- and the reason this file exists separately from an
+# eventual "verified" Goodman config -- is the throughput curve.
+#
+# THROUGHPUT IS A DERIVED FIDUCIAL, NOT A MEASUREMENT.
+# NOIRLab's Goodman red-camera page states its throughput "results will be
+# posted soon" (checked 2026-09; still unpublished as of 2026-09-27). No
+# other public efficiency curve for the red camera + 930 l/mm setup was
+# found. Rather than guess blind, this curve is the SIFS 700M efficiency
+# curve (kino/config/sifs.yaml, itself digitised by eye from a 2016 plot)
+# divided by 0.275 -- the midpoint of the "SIFS is roughly 25-30% of
+# Goodman's efficiency at similar resolution" statement on NOIRLab's SIFS
+# page -- and extended with a plausible taper toward the UV cutoff (~320 nm)
+# and the red CCD QE rolloff (~900 nm). Treat every number here as +/-50%
+# at best until a real throughput curve is available; ask LNA/SOAR staff,
+# or re-derive from an on-sky standard-star exposure if one becomes
+# available. See kino/config/sifs.yaml's own header for the SIFS-side
+# caveats this inherits.
+#
+# Geometry: the slit is a single-object aperture within the fixed
+# complement of long slits (0.45-10.2 arcsec); 1.0 arcsec is chosen as a
+# seeing-limited-typical width. Slit LENGTH here (15 arcsec, n_spatial=100)
+# follows the same convention kino/config/gmacs.yaml set for a *per-target*
+# single slit -- not the full 3.9 arcmin the physical long slits span,
+# which matters for a MOS mask, not a single galaxy's spectrum.
+#
+# Spectral resolution: the 930 l/mm grating gives R=4450 (0.42 A/pix) at
+# 550 nm with NOIRLab's reference 0.46 arcsec slit; set as `lsf` below (a
+# fixed dispersion-limited resolving power). For a source filling a wider
+# slit (as 1.0 arcsec does for most targets) the *true* delivered
+# resolution is slit-limited, coarser than this (~2.8 A FWHM at 1.0 arcsec
+# per NOIRLab's own numbers) -- kino.instruments.slit does not model that
+# slit-width-driven spectral blur separately from the fixed `lsf`, so
+# velocity dispersions measured through this config are optimistic by
+# roughly that amount. Left as a known idealisation for now (see CLAUDE.md).
+
+slit_width: "1.0 arcsec"        # one of Goodman's fixed long-slit widths
+pixel_scale: "0.15 arcsec"      # sourced: unbinned Goodman spectroscopic pixel scale
+n_spatial: 100                  # 100 * 0.15" = 15" -- per-target slit length, see header
+slit_pa: 0.0                    # degrees, East of North
+# slit_offset defaults to (0, 0) -- centred on the target
+margin: 10
+
+wavelength_min: "0.49 um"       # centred near [O III] 5007 for z ~ 0-0.02; override per target
+wavelength_max: "0.51 um"
+n_wave: 476                     # 0.42 A/pix (930 l/mm, sourced) over this 200 A window
+
+lsf:
+  resolving_power: 4450         # 930 l/mm grating, 550 nm, 0.46" slit (sourced) -- see header caveat
+
+psf:
+  seeing_fwhm: "0.9 arcsec"     # ground-based, seeing-limited (no AO); sweep this, don't trust it
+  # defocus, coma*, astig*, trefoil*, spher default to 0.0 (unaberrated optics)
+
+throughput:
+  # FIDUCIAL, derived from SIFS's curve / 0.275 -- see header. Not a measurement.
+  wavelength: ["0.32 um", "0.40 um", "0.45 um", "0.493 um", "0.55 um", "0.60 um", "0.65 um", "0.70 um", "0.73 um", "0.80 um", "0.90 um"]
+  transmission: [0.10, 0.22, 0.296, 0.353, 0.320, 0.302, 0.269, 0.216, 0.127, 0.090, 0.040]
+
+aperture_diameter: "4.1 m"      # SOAR
+obstruction_fraction: 0.0       # already netted into throughput/effective diameter above
+
+detector:
+  read_noise: "3.89 electron"   # sourced: Goodman red camera, 344ATTN3 readout, 1x1 binning
+  dark_current: "0.001 electron / s"  # UNVERIFIED PLACEHOLDER -- no published value found
+
+exposure_time: "1200 s"
+n_exposures: 3                  # fiducial 1 hour total integration
+
+sky_electron_rate: "0 electron / s"   # PLACEHOLDER -- use kino.observing.skymodel at forecast time

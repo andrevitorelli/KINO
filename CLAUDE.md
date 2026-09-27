@@ -62,10 +62,14 @@ Read it before making changes. Keep it up to date as the project evolves.
 > table -> line flux (`kino.io.spectrum`) -> night/moon/airmass/sky/extinction
 > (`kino.observing`) -> Fisher shear precision against seeing
 > (`kino.analysis.fisher`/`forecast`; the default cube-level estimator is unbiased and
-> validated, but is a *perfect-model statistical* bound, so pass an intrinsic floor), with
+> validated, but is a *perfect-model statistical* bound -- the primary forecast is that
+> idealised number, `intrinsic_sigma` an optional sensitivity comparison), with
 > `kino/config/sifs.yaml` for SOAR SIFS (sky, dark current and the 700R efficiency are still
-> unverified; see the file's header). No slit/grism forecast, Goodman config or
-> near-infrared yet. Notebooks 08-10 showcase this work.
+> unverified; see the file's header) and `kino/config/goodman.yaml` for SOAR Goodman (real
+> geometry/detector, but its throughput is a *derived fiducial* -- NOIRLab has not published
+> the red-camera curve -- see the file's header). No slit/grism likelihood or forecast yet
+> (`SlitSpectrograph` renders mocks; nothing fits them), and no near-infrared. Notebooks 08-10
+> showcase the IFU side.
 
 ## What KINO is
 
@@ -309,9 +313,12 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   nuisance parameters far below any prior (inclination to ~0.1 deg), the marginal shear precision
   comes out 1e-3-1e-2 per galaxy for bright targets -- **not achievable on real galaxies**, whose
   non-circular motions, thickness, warps and PSF/model errors set a floor the bound ignores.
-  `forecast_ifu(..., intrinsic_sigma=...)` adds such a floor in quadrature (no default: it is a
-  scientific assumption; the README's published-forecast target is sigma_eps ~ 0.02-0.04) and
-  `psf_error=` adds the shear bias from a wrong assumed PSF FWHM (the converged
+  Real-galaxy calibration of that floor is explicitly **out of scope for now** (it belongs to a
+  future project applying this code, not to validating the pipeline itself -- 2026-09-27 user
+  direction): the primary forecast KINO reports is the **idealised, statistical** S/N
+  (`shear_snr_stat`), clearly labelled as such rather than blocked on a floor nobody has measured
+  yet. `forecast_ifu(..., intrinsic_sigma=...)` remains available for a *sensitivity* comparison
+  (no default) and `psf_error=` adds the shear bias from a wrong assumed PSF FWHM (the converged
   Levenberg-Marquardt fit of the mis-specified model, not the linear formula, which is 2-3x off at
   high S/N). `forecast_ifu` tiles this over `(time, seeing)` through a night: airmass, the sky
   spectrum (`kino.observing.skymodel`), CTIO extinction on the line flux (off with
@@ -325,6 +332,17 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   `measure_line_flux` returns what the *aperture* collected (pass `aperture_correction` for the
   whole galaxy) with an error whose pull was checked to be ~1. Candidate target lists are private:
   never commit one or use a real target name in code, tests, notebooks or reports.
+- **Instrument configs from partial data (`kino/config/sifs.yaml`, `kino/config/goodman.yaml`):**
+  unlike the fully-fiducial Phase 7 concept configs (`gmtifs.yaml`, `gmacs.yaml`), these use
+  *real* SOAR geometry/detector numbers where published, and mark every unsourced field in the
+  file's own header rather than silently defaulting. `goodman.yaml`'s throughput curve is a
+  worked example of that: NOIRLab's Goodman red-camera efficiency is unpublished, so the curve
+  is SIFS's own (also digitised-by-eye) efficiency divided by 0.275 -- the midpoint of NOIRLab's
+  "SIFS is 25-30% of Goodman's efficiency at similar resolution" statement -- not a blind guess,
+  but not a measurement either; `tests/instruments/test_goodman_config.py` pins the exact
+  derivation so a real curve replacing it is a deliberate, visible change. Before adding another
+  such config, look for the real number first; only fall back to a documented, derived fiducial
+  when none exists.
 - **External-data readers (`kino.io.manga`, `kino.io.download`):** convert
   to KINO's conventions in the reader, not downstream (`TEST_DATA.md`
   Section 5) — but check each reader's own module docstring for which

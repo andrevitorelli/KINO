@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
 
 ### Added
 
+- **SOAR Goodman config** (`kino/config/goodman.yaml`): real geometry, 930 l/mm dispersion/
+  resolution, and red-camera read noise from NOIRLab's published pages; its throughput is a
+  documented *derived fiducial* (SIFS's own digitised curve divided by 0.275, the midpoint of
+  NOIRLab's "SIFS is 25-30% of Goodman's efficiency" statement), since the real Goodman
+  red-camera throughput remains unpublished. `tests/instruments/test_goodman_config.py` pins
+  the derivation.
+
 - **Phase 0 — project setup**: git repository initialised; MIT `LICENSE`;
   GitHub Actions CI (lint + test matrix, Python 3.10-3.12); pre-commit config;
   `CONTRIBUTING.md`; issue and pull-request templates.

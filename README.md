@@ -290,13 +290,17 @@ summary level.
       zodiacal light, starlight) interpolated offline, with per-channel sky
       electron rates for the `IFU`. Also done: a strict-units spectrum-table reader
       and line-flux measurement (`kino.io.spectrum`), a fast cube-level Fisher shear forecast
-      validated against maximum-likelihood ensembles (`kino.analysis.fisher`), with an
-      intrinsic-floor and PSF-mismatch error budget, and an unbiased voxel-level
-      `IFUCubeLikelihood`, and
+      validated against maximum-likelihood ensembles (`kino.analysis.fisher`), with a
+      PSF-mismatch error budget and an unbiased voxel-level `IFUCubeLikelihood`, and
       `forecast_ifu` -- shear S/N against seeing through a night, for the IFU
-      (`notebooks/10_sifs_forecast.ipynb`). **Not done**: the slit equivalent (needs a
-      slit likelihood and the Goodman red-camera throughput), date ranges and
-      batching over a private candidate list, Cerro Pachon corrections to the
+      (`notebooks/10_sifs_forecast.ipynb`). The primary forecast is the idealised,
+      statistical S/N (no default intrinsic floor: real-galaxy calibration of one is
+      out of scope for now, a future project's problem, not this pipeline's -- an
+      `intrinsic_sigma` sensitivity comparison remains available). `kino/config/goodman.yaml`
+      gives SOAR Goodman real geometry/detector numbers with a *derived fiducial*
+      throughput (NOIRLab has not published the red-camera curve). **Not done**: a slit
+      likelihood/forecast (`SlitSpectrograph` renders mocks; nothing fits them yet), date
+      ranges and batching over a private candidate list, Cerro Pachon corrections to the
       Paranal sky model, and the near-infrared (sky library ends at 1 micron).
 - [ ] GMTIFS-like forecast: AO PSF, 25–50 mas spaxels, 4″×2″ field, R≈5–10k,
       0.9–2.5 µm; Hα/[O III] kinematics of z≈0.4–1.5 background discs.
