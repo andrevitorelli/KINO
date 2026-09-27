@@ -190,6 +190,22 @@ class SlitSpectrograph(Instrument):
     def slit_length(self) -> u.Quantity:
         return self.n_spatial * self.pixel_scale
 
+    def baseline_electrons(self) -> np.ndarray:
+        """Expected sky + dark electrons per channel per along-slit pixel over the
+        whole exposure, shape ``(n_wave, 1, 1)`` -- the *known* baseline the
+        spectrum carries under the line (before noise). Mirrors
+        :meth:`kino.instruments.ifu.IFU.baseline_electrons`; pass it as
+        ``subtract_background`` to :func:`kino.analysis.moments.compute_moment_maps`
+        to reduce ``observe()``'s ``spectrum`` without estimating the background
+        from the data.
+        """
+        exposure_total = self.exposure_time * self.n_exposures
+        sky = np.broadcast_to(
+            (self.sky_electron_rate * exposure_total).to_value(u.electron), (self.n_wave,)
+        )
+        dark = (self.detector.dark_current * exposure_total).to_value(u.electron)
+        return (sky + dark)[:, np.newaxis, np.newaxis]
+
     def _n_width_native(self) -> int:
         return max(
             1, int(np.ceil((self.slit_width / self.pixel_scale).to_value(u.dimensionless_unscaled)))
@@ -274,12 +290,8 @@ class SlitSpectrograph(Instrument):
         signal_electron = photon_flux_to_electrons(
             spectrum_native, wave_centers, self.throughput, self.effective_area, exposure_total
         )
-        sky_electron = np.broadcast_to(
-            (self.sky_electron_rate * exposure_total).to_value(u.electron),
-            (self.n_wave,),
-        )[:, np.newaxis] * np.ones((1, self.n_spatial))
-        dark_electron = (self.detector.dark_current * exposure_total).to_value(u.electron)
-        expected_spectrum = signal_electron + sky_electron + dark_electron
+        baseline = self.baseline_electrons()  # (n_wave, 1, 1): sky + dark
+        expected_spectrum = signal_electron + baseline[:, 0, :]
         spectrum_counts, spectrum_variance = apply_shot_and_read_noise(
             expected_spectrum, self.detector.read_noise, self.n_exposures, rng
         )
@@ -311,10 +323,12 @@ class SlitSpectrograph(Instrument):
         image_signal = photon_flux_to_electrons(
             image_native_percow, wave_centers, self.throughput, self.effective_area, exposure_total
         )
-        image_sky = (self.sky_electron_rate * exposure_total).to_value(u.electron) * np.ones(
-            (self.n_wave, n_v_native, n_u_native)
-        )
-        expected_image = (image_signal + image_sky + dark_electron).sum(axis=0)
+        # `baseline` broadcasts (n_wave, 1, 1) against every image pixel -- correct whether
+        # sky_electron_rate is a scalar or, as kino.observing.skymodel's helpers return, a
+        # per-channel (n_wave,) array (a bare `* np.ones((n_wave, ny, nx))` here would only
+        # broadcast the scalar case; that was this branch's bug until an array-valued rate
+        # was first exercised through SlitSpectrograph).
+        expected_image = (image_signal + baseline).sum(axis=0)
         image_counts, _ = apply_shot_and_read_noise(
             expected_image, self.detector.read_noise, self.n_exposures, rng
         )

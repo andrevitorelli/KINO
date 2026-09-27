@@ -1,30 +1,36 @@
 """Target-level forecast: shear S/N as a function of seeing, for a given night.
 
-``forecast_ifu`` is the entry point that ties the observing-conditions layer
-(:mod:`kino.observing`) to an instrument backend and the fast Fisher estimate
+``forecast_ifu`` and ``forecast_slit`` are the entry points that tie the
+observing-conditions layer (:mod:`kino.observing`) to an instrument backend
+(an :class:`~kino.instruments.ifu.IFU` or a
+:class:`~kino.instruments.slit.SlitSpectrograph`) and the fast Fisher estimate
 (:mod:`kino.analysis.fisher`). Given
 
-* an IFU (its exposure, throughput, detector, PSF machinery),
+* an instrument (its exposure, throughput, detector, PSF machinery),
 * a target: sky position, a :class:`~kino.galaxy.DiscGalaxy` (geometry and
   redshift) and the line flux measured from its spectrum
   (:func:`kino.io.spectrum.measure_line_flux`),
 * a night, and the shear you expect,
 
-it returns, at times through the night and for each seeing you ask about, the
+each returns, at times through the night and for each seeing you ask about, the
 airmass, the sky, the effective seeing, the line S/N and the shear precision and
 S/N -- all computed with the sky, moon, extinction and seeing appropriate to
-that moment.
+that moment. Both are thin wrappers around ``_forecast`` (below), which does the
+actual work and is agnostic to which instrument type it was given.
 
 What happens at each (time, seeing) point:
 
 1. airmass, moon phase/altitude/separation and ecliptic position from the
    target's track (``kino.observing``);
 2. a sky spectrum from the offline SkyCalc library, converted to detected
-   electrons per channel on the instrument's own collecting area/throughput;
+   electrons per channel on the instrument's own collecting area/throughput
+   (per spaxel for an IFU, per along-slit pixel for a slit);
 3. the line flux dimmed by CTIO atmospheric extinction (``include_extinction``);
 4. the quoted (500 nm, zenith) seeing converted to the observed wavelength and
-   airmass (Kolmogorov scaling), set as the IFU's seeing PSF;
-5. :func:`~kino.analysis.fisher.shear_fisher` on the noiseless expected cube.
+   airmass (Kolmogorov scaling), set as the instrument's seeing PSF;
+5. :func:`~kino.analysis.fisher.shear_fisher` on the noiseless expected cube
+   (the ``"cube"`` estimator works for either instrument; slit losses are
+   inside the model exactly as they are inside a real slit observation).
 
 Assumptions you must be comfortable with (each is also in ``CLAUDE.md``):
 
@@ -35,9 +41,14 @@ Assumptions you must be comfortable with (each is also in ``CLAUDE.md``):
 * the sky model is Paranal's, not the site's; airglow is a whole-night mean;
 * ``line_flux`` is the *whole galaxy's intrinsic* flux (aperture-corrected,
   magnification neglected -- a few per cent for weak lensing);
-* only the emission line's moment maps constrain the shear -- no continuum;
+* only the emission line constrains the shear -- no continuum;
 * the spectral window is cropped to ``window_kms`` around the line, keeping the
-  instrument's native dispersion (the moment-map window-width caveat).
+  instrument's native dispersion, purely so the many renders a forecast needs
+  stay fast -- not a physical limitation (see ``narrowed_ifu``/``narrowed_slit``);
+* the primary, default forecast (``intrinsic_sigma=None``) is the **idealised
+  statistical** bound: real-galaxy floor calibration (non-circular motions,
+  disc thickness, ...) is out of scope for now (2026-09-27 direction) and left
+  as an optional sensitivity comparison, not a required input.
 """
 
 from __future__ import annotations
@@ -64,7 +75,12 @@ from kino.observing.conditions import (
 from kino.observing.extinction import atmospheric_transmission
 from kino.observing.night import Night
 from kino.observing.site import SOAR, Site
-from kino.observing.skymodel import SkyConditions, SkyLibrary, ifu_sky_electron_rate
+from kino.observing.skymodel import (
+    SkyConditions,
+    SkyLibrary,
+    ifu_sky_electron_rate,
+    slit_sky_electron_rate,
+)
 
 C_KMS = 299792.458
 
@@ -103,7 +119,7 @@ class ForecastTarget:
 
 
 @dataclass(frozen=True)
-class IFUForecast:
+class TargetForecast:
     """Forecast on a grid of ``(time, seeing)``.
 
     Array shapes: per-time quantities ``(n_t,)``; per-point quantities
@@ -197,47 +213,34 @@ class IFUForecast:
         return out
 
 
-def narrowed_ifu(ifu, observed_wavelength: u.Quantity, window_kms: float):
-    """``ifu`` re-windowed to ``+/- window_kms`` around the line, at its native dispersion."""
-    channel = ((ifu.wavelength_max - ifu.wavelength_min) / ifu.n_wave).to(u.AA)
+def _narrowed(instrument, observed_wavelength: u.Quantity, window_kms: float):
+    """``instrument`` (IFU or SlitSpectrograph) re-windowed to ``+/- window_kms``
+    around the line, at its native dispersion. Shared by :func:`narrowed_ifu` and
+    :func:`narrowed_slit` -- both types expose the same ``wavelength_min``/
+    ``wavelength_max``/``n_wave`` fields and support ``dataclasses.replace``."""
+    channel = ((instrument.wavelength_max - instrument.wavelength_min) / instrument.n_wave).to(u.AA)
     half = (observed_wavelength * window_kms / C_KMS).to(u.AA)
     n_wave = max(int(round((2 * half / channel).decompose().value)), 8)
     half = 0.5 * n_wave * channel
     return dataclasses.replace(
-        ifu,
-        wavelength_min=(observed_wavelength - half).to(ifu.wavelength_min.unit),
-        wavelength_max=(observed_wavelength + half).to(ifu.wavelength_max.unit),
+        instrument,
+        wavelength_min=(observed_wavelength - half).to(instrument.wavelength_min.unit),
+        wavelength_max=(observed_wavelength + half).to(instrument.wavelength_max.unit),
         n_wave=n_wave,
     )
 
 
-def forecast_ifu(
-    ifu,
-    target: ForecastTarget,
-    night: Night,
-    library: SkyLibrary,
-    *,
-    g: tuple[float, float],
-    seeing_ref: u.Quantity,
-    solar_flux: float,
-    site: Site = SOAR,
-    max_airmass: float = 2.0,
-    time_step: u.Quantity = 60.0 * u.min,
-    window_kms: float = 500.0,
-    include_extinction: bool = True,
-    snr_threshold: float = 3.0,
-    priors: dict | None = None,
-    estimator: str = "cube",
-    intrinsic_sigma: float | None = None,
-    psf_error: float | None = None,
-) -> IFUForecast:
-    """Shear S/N against seeing through ``night`` for ``target`` with ``ifu``.
+def narrowed_ifu(ifu, observed_wavelength: u.Quantity, window_kms: float):
+    """``ifu`` re-windowed to ``+/- window_kms`` around the line, at its native dispersion."""
+    return _narrowed(ifu, observed_wavelength, window_kms)
 
-    Parameters
-    ----------
-    ifu : IFU
-        The instrument configuration (exposure, throughput, ... are used as
-        given; its PSF seeing and sky rate are overwritten at each point).
+
+def narrowed_slit(slit, observed_wavelength: u.Quantity, window_kms: float):
+    """``slit`` re-windowed to ``+/- window_kms`` around the line, at its native dispersion."""
+    return _narrowed(slit, observed_wavelength, window_kms)
+
+
+_FORECAST_PARAMS = """
     target : ForecastTarget
     night : Night
         From :func:`kino.observing.night_window`.
@@ -261,18 +264,47 @@ def forecast_ifu(
         (:data:`kino.analysis.fisher.DEFAULT_CUBE_PRIORS`).
     estimator : {"cube", "moments"}
         Fisher estimator (see :func:`kino.analysis.fisher.shear_fisher`); the cube
-        one is the default: unbiased and using the flux image as well as the kinematics.
+        one is the default: unbiased and using the flux image as well as the
+        kinematics (``"moments"`` is IFU only).
     intrinsic_sigma : float, optional
         A per-galaxy shear floor from what the model does not capture -- non-circular
         motions, disc thickness, warps, everything a perfect-model Cramer-Rao bound
-        ignores -- added in quadrature. **There is no default**: the statistical bound
-        alone is optimistic for bright targets, and the floor is a scientific
-        assumption you must make (the README's published-forecast target is
-        ``sigma_eps`` ~ 0.02-0.04).
+        ignores -- added in quadrature. Default ``None`` (no floor): the primary
+        forecast is the **idealised, statistical** S/N (``shear_snr_stat``); real-galaxy
+        floor calibration is a future project's problem, not this pipeline's (2026-09-27
+        direction). Pass a value only for an explicit *sensitivity* comparison (the
+        README's published-forecast target is ``sigma_eps`` ~ 0.02-0.04, for reference).
     psf_error : float, optional
         Fractional error on the assumed PSF FWHM (truth larger by this fraction); adds
         the resulting shear bias, in quadrature, to the error and reports it.
     """
+
+
+def _forecast(
+    instrument,
+    target: ForecastTarget,
+    night: Night,
+    library: SkyLibrary,
+    *,
+    g: tuple[float, float],
+    seeing_ref: u.Quantity,
+    solar_flux: float,
+    site: Site,
+    max_airmass: float,
+    time_step: u.Quantity,
+    window_kms: float,
+    include_extinction: bool,
+    snr_threshold: float,
+    priors: dict | None,
+    estimator: str,
+    intrinsic_sigma: float | None,
+    psf_error: float | None,
+    narrow_fn,
+    sky_rate_fn,
+) -> TargetForecast:
+    """Shared implementation of :func:`forecast_ifu` and :func:`forecast_slit` --
+    identical logic, parameterised only by which narrowing/sky-rate helper matches
+    ``instrument``'s type. See either public function's docstring for the parameters."""
     seeing_ref = u.Quantity(seeing_ref).to(u.arcsec)
     if seeing_ref.ndim != 1 or len(seeing_ref) == 0:
         raise ValueError("seeing_ref must be a non-empty 1-D array")
@@ -286,8 +318,8 @@ def forecast_ifu(
         )
     if include_extinction and lam_obs > 1087.0 * u.nm:
         raise ValueError("the CTIO extinction curve ends at 1087 nm; pass include_extinction=False")
-    ifu_line = narrowed_ifu(ifu, lam_obs, window_kms)
-    if float(np.max(ifu_line.throughput(np.array([lam_um.value]) * u.um))) <= 0.0:
+    instrument_line = narrow_fn(instrument, lam_obs, window_kms)
+    if float(np.max(instrument_line.throughput(np.array([lam_um.value]) * u.um))) <= 0.0:
         raise ValueError(
             f"the instrument's throughput curve is zero at the observed line ({lam_obs:.0f}): "
             "this target's line is outside its tabulated coverage"
@@ -330,19 +362,19 @@ def forecast_ifu(
             ecliptic_lon_from_sun=ecl_lon[i],
             ecliptic_lat=ecl_lat[i],
         )
-        sky_rate = ifu_sky_electron_rate(ifu_line, cond, library)
+        sky_rate = sky_rate_fn(instrument_line, cond, library)
         flux = target.line_flux
         if include_extinction:
             flux = flux * float(atmospheric_transmission(lam_obs, x)[0])
         for j, s_ref in enumerate(seeing_ref):
             eff = seeing_at(s_ref, x, lam_obs)
             eff_seeing[i, j] = eff
-            ifu_t = dataclasses.replace(
-                ifu_line, psf=PSF(seeing_fwhm=eff), sky_electron_rate=sky_rate
+            instrument_t = dataclasses.replace(
+                instrument_line, psf=PSF(seeing_fwhm=eff), sky_electron_rate=sky_rate
             )
             try:
                 res: FisherResult = shear_fisher(
-                    ifu_t,
+                    instrument_t,
                     target.galaxy,
                     line_flux=flux,
                     line_wavelength=target.rest_wavelength,
@@ -373,7 +405,7 @@ def forecast_ifu(
                 out["snr_stat"][i, j] = gnorm / np.sqrt(var_stat)
                 out["snr"][i, j] = gnorm / np.sqrt(var_stat + extra)
 
-    return IFUForecast(
+    return TargetForecast(
         times=times,
         airmass=np.asarray(track.airmass),
         altitude=track.altitude,
@@ -400,10 +432,98 @@ def forecast_ifu(
             "window_kms": window_kms,
             "include_extinction": include_extinction,
             "max_airmass": max_airmass,
-            "exposure_total": (ifu.exposure_time * ifu.n_exposures).to(u.s),
+            "exposure_total": (instrument.exposure_time * instrument.n_exposures).to(u.s),
             "target": target.name,
             "estimator": estimator,
             "intrinsic_sigma": intrinsic_sigma,
             "psf_error": psf_error,
         },
     )
+
+
+def forecast_ifu(
+    ifu,
+    target: ForecastTarget,
+    night: Night,
+    library: SkyLibrary,
+    *,
+    g: tuple[float, float],
+    seeing_ref: u.Quantity,
+    solar_flux: float,
+    site: Site = SOAR,
+    max_airmass: float = 2.0,
+    time_step: u.Quantity = 60.0 * u.min,
+    window_kms: float = 500.0,
+    include_extinction: bool = True,
+    snr_threshold: float = 3.0,
+    priors: dict | None = None,
+    estimator: str = "cube",
+    intrinsic_sigma: float | None = None,
+    psf_error: float | None = None,
+) -> TargetForecast:
+    return _forecast(
+        ifu, target, night, library, g=g, seeing_ref=seeing_ref, solar_flux=solar_flux, site=site,
+        max_airmass=max_airmass, time_step=time_step, window_kms=window_kms,
+        include_extinction=include_extinction, snr_threshold=snr_threshold, priors=priors,
+        estimator=estimator, intrinsic_sigma=intrinsic_sigma, psf_error=psf_error,
+        narrow_fn=narrowed_ifu, sky_rate_fn=ifu_sky_electron_rate,
+    )  # fmt: skip
+
+
+forecast_ifu.__doc__ = f"""Shear S/N against seeing through ``night`` for ``target`` with ``ifu``.
+
+    Parameters
+    ----------
+    ifu : IFU
+        The instrument configuration (exposure, throughput, ... are used as
+        given; its PSF seeing and sky rate are overwritten at each point).
+    {_FORECAST_PARAMS}"""
+
+
+def forecast_slit(
+    slit,
+    target: ForecastTarget,
+    night: Night,
+    library: SkyLibrary,
+    *,
+    g: tuple[float, float],
+    seeing_ref: u.Quantity,
+    solar_flux: float,
+    site: Site = SOAR,
+    max_airmass: float = 2.0,
+    time_step: u.Quantity = 60.0 * u.min,
+    window_kms: float = 500.0,
+    include_extinction: bool = True,
+    snr_threshold: float = 3.0,
+    priors: dict | None = None,
+    estimator: str = "cube",
+    intrinsic_sigma: float | None = None,
+    psf_error: float | None = None,
+) -> TargetForecast:
+    if estimator != "cube":
+        raise ValueError(
+            "forecast_slit only supports estimator='cube' -- no slit moment likelihood"
+        )
+    return _forecast(
+        slit, target, night, library, g=g, seeing_ref=seeing_ref, solar_flux=solar_flux, site=site,
+        max_airmass=max_airmass, time_step=time_step, window_kms=window_kms,
+        include_extinction=include_extinction, snr_threshold=snr_threshold, priors=priors,
+        estimator=estimator, intrinsic_sigma=intrinsic_sigma, psf_error=psf_error,
+        narrow_fn=narrowed_slit, sky_rate_fn=slit_sky_electron_rate,
+    )  # fmt: skip
+
+
+forecast_slit.__doc__ = f"""Shear S/N against seeing through ``night`` for ``target`` with ``slit``.
+
+    Slit losses (a source wider than the slit, or a misaligned ``slit_pa``/
+    ``slit_offset``) fall out of the same forward render the IFU case uses -- no
+    separate loss factor. ``estimator`` must be ``"cube"``
+    (:class:`~kino.inference.likelihood.SlitCubeLikelihood`'s bound); there is no
+    slit moment-map likelihood.
+
+    Parameters
+    ----------
+    slit : SlitSpectrograph
+        The instrument configuration (exposure, throughput, slit geometry, ... are
+        used as given; its PSF seeing and sky rate are overwritten at each point).
+    {_FORECAST_PARAMS}"""

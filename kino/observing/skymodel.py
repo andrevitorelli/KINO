@@ -321,3 +321,28 @@ def ifu_sky_electron_rate(
         effective_area=ifu.effective_area,
         throughput=ifu.throughput,
     )
+
+
+def slit_sky_electron_rate(
+    slit,
+    conditions: SkyConditions,
+    library: SkyLibrary,
+) -> u.Quantity:
+    """Per-channel sky electron rate for a :class:`~kino.instruments.slit.SlitSpectrograph`.
+
+    Returns a ``(n_wave,)`` array to assign to ``SlitSpectrograph.sky_electron_rate``
+    (e.g. with ``dataclasses.replace``) -- a rate *per along-slit pixel*, matching that
+    field's own convention (``CLAUDE.md``'s "Slit geometry and losses"). The sky enters
+    through the slit's full width and is sampled along its length in ``pixel_scale``
+    steps, so the relevant sky-collecting area per along-slit pixel is
+    ``pixel_scale * slit_width``, not ``pixel_scale ** 2`` as for an IFU's square
+    spaxel. The slit's channel edges are taken as vacuum wavelengths.
+    """
+    edges = np.linspace(slit.wavelength_min, slit.wavelength_max, slit.n_wave + 1)
+    sky = library.spectrum(conditions, edges)
+    return sky_electron_rate(
+        sky,
+        pixel_area=slit.pixel_scale * slit.slit_width,
+        effective_area=slit.effective_area,
+        throughput=slit.throughput,
+    )

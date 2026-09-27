@@ -179,3 +179,47 @@ class TestPsfMismatchBias:
         plus = fisher(psf_error=0.1, free=["inc", "pa", "v_flat"])
         minus = fisher(psf_error=-0.1, free=["inc", "pa", "v_flat"])
         assert plus.psf_bias[0] * minus.psf_bias[0] < 0 or plus.psf_bias[1] * minus.psf_bias[1] < 0
+
+
+class TestSlitInstrument:
+    """shear_fisher's cube estimator, given a SlitSpectrograph instead of an IFU."""
+
+    @staticmethod
+    def make_slit():
+        from kino.instruments.slit import SlitSpectrograph
+
+        return SlitSpectrograph(
+            slit_width=1.0 * u.arcsec, pixel_scale=0.15 * u.arcsec, n_spatial=20,
+            wavelength_min=1.098 * u.um, wavelength_max=1.102 * u.um, n_wave=24,
+            psf=PSF(seeing_fwhm=0.5 * u.arcsec), lsf=LSF(resolving_power=8000.0),
+            throughput=Throughput(wavelength=[1.0, 1.2] * u.um, transmission=[1.0, 1.0]),
+            aperture_diameter=10 * u.m,
+            detector=Detector(read_noise=2 * u.electron, dark_current=0 * u.electron / u.s),
+            exposure_time=600 * u.s, sky_electron_rate=0.5 * u.electron / u.s,
+        )  # fmt: skip
+
+    def test_returns_a_sensible_result(self):
+        r = shear_fisher(
+            self.make_slit(), DiscGalaxy(**GAL), line_flux=LINE_FLUX,
+            line_wavelength=LINE_WAVELENGTH, g=G,
+        )  # fmt: skip
+        assert 0 < r.sigma_fixed[0] < 1
+        assert r.sigma_marginal[0] >= r.sigma_fixed[0]
+        assert r.median_spaxel_snr > 0
+        assert r.meta["estimator"] == "cube"
+
+    def test_moment_estimator_is_ifu_only(self):
+        with pytest.raises(AttributeError):
+            shear_fisher(
+                self.make_slit(), DiscGalaxy(**GAL), line_flux=LINE_FLUX,
+                line_wavelength=LINE_WAVELENGTH, g=G, estimator="moments",
+            )  # fmt: skip
+
+    def test_psf_mismatch_bias_also_works_for_a_slit(self):
+        r = shear_fisher(
+            self.make_slit(), DiscGalaxy(**GAL), line_flux=LINE_FLUX,
+            line_wavelength=LINE_WAVELENGTH, g=G, free=["inc", "pa", "v_flat"],
+            priors={"inc": 5.0, "pa": 2.0, "v_flat": 0.25}, psf_error=0.1,
+        )  # fmt: skip
+        assert np.all(np.isfinite(r.psf_bias))
+        assert np.hypot(*r.psf_bias) > 0

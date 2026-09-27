@@ -211,16 +211,21 @@ tests and a runnable example before the next begins.
 
 ### Phase 5 — Inference engine
 - [x] Likelihood for the **IFU** case (fit model cube / moment maps to data).
-      `kino.inference.likelihood.IFUMomentLikelihood` -- the "moment maps"
-      option the bullet names: forward-models each trial through the exact
-      same `IFU` + `compute_moment_maps` pipeline the data went through
-      (so PSF-driven beam smearing cancels between model and data rather
-      than biasing every fit), and compares Vlos/dispersion (optionally
-      flux) via a Gaussian chi-square using the data's own delta-method
-      uncertainties, only over spaxels its own S/N mask judged trustworthy.
-- [ ] Likelihood for the **slit/grism** case (fit 2-D spectrum + image jointly).
-      Deferred -- a distinct design (joint spatial + spectral fit) from the
-      IFU case above, not a small extension of it.
+      `kino.inference.likelihood.IFUCubeLikelihood` (the one to use: every voxel of
+      the cube, unbiased) and `IFUMomentLikelihood` (the original "moment maps"
+      option the bullet names, kept for comparison but noise-biased at low S/N --
+      see `CLAUDE.md`). Both forward-model each trial through the exact same `IFU`
+      pipeline the data went through, so PSF-driven beam smearing cancels between
+      model and data rather than biasing every fit.
+- [x] Likelihood for the **slit/grism** case (fit the dispersed 2-D spectrum).
+      `kino.inference.likelihood.SlitCubeLikelihood`: the `SlitSpectrograph`
+      analogue of `IFUCubeLikelihood`, fitting `SlitObservation.spectrum` voxel by
+      voxel (the companion broadband image is a placement aid, not fit). Slit
+      losses fall directly out of `SlitSpectrograph.observe()`'s own rendering, so
+      they are inside the model exactly as they are inside the data -- no separate
+      loss parameter. No slit moment-map likelihood (the joint spatial+spectral
+      moment design the original bullet named); the cube approach sidesteps needing
+      one.
 - [x] Priors module (Tully–Fisher prior on rotation, geometry priors).
       `kino.inference.priors`: `build_prior` wraps any `{name: (low, high)}`
       or `{name: scipy.stats distribution}` into a `nautilus.Prior`, e.g.
@@ -288,20 +293,23 @@ summary level.
       (Krisciunas & Schaefer 1991) as a cross-check; and a full sky *spectrum*
       model -- a local library of ESO SkyCalc output (moonlight, airglow lines,
       zodiacal light, starlight) interpolated offline, with per-channel sky
-      electron rates for the `IFU`. Also done: a strict-units spectrum-table reader
+      electron rates for the `IFU` (per spaxel) and the `SlitSpectrograph` (per
+      along-slit pixel). Also done: a strict-units spectrum-table reader
       and line-flux measurement (`kino.io.spectrum`), a fast cube-level Fisher shear forecast
-      validated against maximum-likelihood ensembles (`kino.analysis.fisher`), with a
-      PSF-mismatch error budget and an unbiased voxel-level `IFUCubeLikelihood`, and
-      `forecast_ifu` -- shear S/N against seeing through a night, for the IFU
-      (`notebooks/10_sifs_forecast.ipynb`). The primary forecast is the idealised,
-      statistical S/N (no default intrinsic floor: real-galaxy calibration of one is
-      out of scope for now, a future project's problem, not this pipeline's -- an
-      `intrinsic_sigma` sensitivity comparison remains available). `kino/config/goodman.yaml`
-      gives SOAR Goodman real geometry/detector numbers with a *derived fiducial*
-      throughput (NOIRLab has not published the red-camera curve). **Not done**: a slit
-      likelihood/forecast (`SlitSpectrograph` renders mocks; nothing fits them yet), date
-      ranges and batching over a private candidate list, Cerro Pachon corrections to the
-      Paranal sky model, and the near-infrared (sky library ends at 1 micron).
+      validated against maximum-likelihood ensembles for **both instruments**
+      (`kino.analysis.fisher`), with a PSF-mismatch error budget and unbiased voxel-level
+      likelihoods (`IFUCubeLikelihood`, `SlitCubeLikelihood`), and `forecast_ifu`/
+      `forecast_slit` -- shear S/N against seeing through a night
+      (`notebooks/10_sifs_forecast.ipynb` for the IFU; no slit-forecast notebook yet).
+      The primary forecast is the idealised, statistical S/N (no default intrinsic floor:
+      real-galaxy calibration of one is out of scope for now, a future project's problem,
+      not this pipeline's -- an `intrinsic_sigma` sensitivity comparison remains available).
+      `kino/config/goodman.yaml` gives SOAR Goodman real geometry/detector numbers with a
+      throughput derived from a real on-sky standard-star measurement (see the file's own
+      caveats -- wrong grating, one star one night). **Not done**: a slit-forecast showcase
+      notebook, date ranges and batching over a private candidate list, Cerro Pachon
+      corrections to the Paranal sky model, and the near-infrared (sky library ends at 1
+      micron).
 - [ ] GMTIFS-like forecast: AO PSF, 25–50 mas spaxels, 4″×2″ field, R≈5–10k,
       0.9–2.5 µm; Hα/[O III] kinematics of z≈0.4–1.5 background discs.
 - [ ] MANIFEST+GMACS-like forecast: fibre-IFU bundles / multi-slit, R≈2–5k,

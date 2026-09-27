@@ -33,6 +33,7 @@ from kino.observing.skymodel import (
     SkySpectrum,
     ifu_sky_electron_rate,
     sky_electron_rate,
+    slit_sky_electron_rate,
 )
 from kino.observing.solar import NOAA_SWPC_F107_PREDICTION, solar_flux
 
@@ -62,5 +63,6 @@ __all__ = [
     "solar_flux",
     "sky_brightness_v",
     "sky_electron_rate",
+    "slit_sky_electron_rate",
     "target_track",
 ]

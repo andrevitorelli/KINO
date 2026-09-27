@@ -1,5 +1,5 @@
 {
- "note": "Validation of the shear forecast and likelihoods against real fits on many noise realisations. Produced by scripts/validate_fisher_forecast.py (nested sampling) and scripts/validate_fisher_mle.py (maximum likelihood). 'g_true' is (0.03,-0.02) for the small-IFU nested runs and (0.05,0) / (0.035,-0.02) for the SIFS / gmtifs-notebook-04 MLE runs. The 'before fix' entry is a summary only (raw trials not kept).",
+ "note": "Validation of the shear forecast and likelihoods against real fits on many noise realisations. Produced by scripts/validate_fisher_forecast.py (nested sampling) and scripts/validate_fisher_mle.py (maximum likelihood). 'g_true' is (0.03,-0.02) for the small-IFU nested runs and (0.05,0) / (0.035,-0.02) for the SIFS / gmtifs-notebook-04 MLE runs. The 'before fix' entry is a summary only (raw trials not kept). 'mle_slit_cube' validates SlitCubeLikelihood/shear_fisher for a SlitSpectrograph the same way as 'mle_cube_shear_only' does for the IFU.",
  "nested_sampling_moments": {
   "before_fix_narrow_median": {
    "label": "narrow window, median background (before fix)",
@@ -566,5 +566,33 @@
     ]
    }
   ]
- }
+ },
+ "mle_slit_cube": [
+  {
+   "label": "Goodman-like slit, F=5e-14, read noise 3e-, sky 0.5e-/s",
+   "estimator": "cube",
+   "median_spaxel_snr": 555.7,
+   "n": 20,
+   "bias": [
+    -0.00011,
+    9e-05
+   ],
+   "bias_err": [
+    9e-05,
+    0.00018
+   ],
+   "scatter": [
+    0.00039,
+    0.00082
+   ],
+   "fisher_sigma_fixed": [
+    0.00049,
+    0.00084
+   ],
+   "scatter_over_fisher": [
+    0.81,
+    0.98
+   ]
+  }
+ ]
 }

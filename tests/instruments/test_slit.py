@@ -196,3 +196,35 @@ class TestValidation:
     def test_rejects_non_positive_slit_width(self):
         with pytest.raises(ValueError):
             make_slit(slit_width=0 * u.arcsec)
+
+
+class TestSlitBaseline:
+    def test_baseline_is_sky_plus_dark_over_the_whole_exposure(self):
+        slit = make_slit(
+            n_wave=10, exposure_time=100 * u.s, n_exposures=3,
+            dark_current=0.01 * u.electron / u.s, sky_electron_rate=0.5 * u.electron / u.s,
+        )  # fmt: skip
+        b = slit.baseline_electrons()
+        assert b.shape == (10, 1, 1)
+        assert b == pytest.approx((0.5 + 0.01) * 300.0)
+
+    def test_baseline_is_the_noiseless_floor_of_an_empty_scene(self):
+        slit = make_slit(
+            n_wave=10, exposure_time=100 * u.s, dark_current=0.02 * u.electron / u.s,
+            sky_electron_rate=np.linspace(0.1, 0.5, 10) * u.electron / u.s,
+        )  # fmt: skip
+        gal = DiscGalaxy(r_e=0.1, inc=30.0, pa=0.0, v_flat=100.0, z=0.0, sigma0=20.0)
+        obs = slit.observe(gal, line_flux=1e-40 * u.erg / u.s / u.cm**2, line_wavelength=1.1 * u.um)
+        floor = np.broadcast_to(slit.baseline_electrons(), obs.spectrum.flux.shape)
+        assert obs.spectrum.flux == pytest.approx(floor, rel=1e-6)
+
+    def test_companion_image_accepts_a_per_channel_sky_rate(self):
+        """Regression test: the broadband image used to broadcast
+        ``sky_electron_rate`` incorrectly for a per-channel (n_wave,) array (only a
+        scalar worked), a bug only exercised once kino.observing.skymodel's
+        per-channel sky rates were used with a SlitSpectrograph."""
+        slit = make_slit(n_wave=6, sky_electron_rate=np.linspace(0.1, 0.6, 6) * u.electron / u.s)
+        gal = DiscGalaxy(r_e=0.1, inc=30.0, pa=0.0, v_flat=100.0, z=0.0, sigma0=20.0)
+        obs = slit.observe(gal, line_flux=1e-15 * u.erg / u.s / u.cm**2, line_wavelength=1.1 * u.um)
+        assert np.all(np.isfinite(obs.image))
+        assert obs.image.min() > 0  # sky+dark floor present everywhere

@@ -295,6 +295,10 @@ def _shear_fisher_cube(
     multiplicative factor with a fractional prior (a spectrum measures it to a few
     per cent); its derivative is analytic (the source part of the cube scales with it).
 
+    Works with either an IFU or a SlitSpectrograph (duck-typed: both expose ``.psf``,
+    ``.observe()`` and ``.baseline_electrons()``; a SlitSpectrograph's ``.observe()``
+    result is unwrapped to its ``.spectrum`` before use).
+
     ``psf_error``: the shear bias when the fit assumes ``ifu.psf`` but the data have a
     FWHM larger by that fraction. It is the converged Levenberg-Marquardt solution of
     the mis-specified fit (data rendered with the wrong PSF, fitted with the assumed
@@ -327,9 +331,12 @@ def _shear_fisher_cube(
         kwargs["inc"] = min(max(kwargs["inc"], 0.0), 90.0)
         kwargs["sersic_n"] = max(kwargs["sersic_n"], 0.2)
         scene = apply_shear(DiscGalaxy(**kwargs), theta[0], theta[1])
-        return instrument.observe(
+        result = instrument.observe(
             scene, line_flux=line_flux * factor, line_wavelength=line_wavelength, rng=None
         )
+        # a SlitSpectrograph returns a SlitObservation; only its .spectrum enters the fit
+        # (the companion broadband image is a placement aid, not photometrically fit)
+        return getattr(result, "spectrum", result)
 
     def step_for(k):
         n = names[k]
@@ -443,8 +450,10 @@ def shear_fisher(
 
     Parameters
     ----------
-    ifu : IFU
-        Instrument with its exposure, sky and seeing already set.
+    ifu : IFU or SlitSpectrograph
+        Instrument with its exposure, sky and seeing already set. The ``"cube"``
+        estimator works with either (its :class:`IFUCubeLikelihood` or
+        :class:`SlitCubeLikelihood` counterpart); ``"moments"`` is IFU-only.
     galaxy : DiscGalaxy
         The intrinsic galaxy (its geometry is the fiducial point).
     line_flux, line_wavelength : Quantity
@@ -454,9 +463,10 @@ def shear_fisher(
     estimator : {"cube", "moments"}
         ``"cube"`` (default): the Cramer-Rao bound of the voxel-level cube
         likelihood -- unbiased, and it uses the flux image as well as the
-        kinematics. ``"moments"``: the flux-weighted velocity/dispersion moment
-        maps of ``IFUMomentLikelihood`` -- kept for comparison; its estimator has
-        a noise bias at low S/N (see the module docstring).
+        kinematics; works for an IFU or a SlitSpectrograph. ``"moments"``: the
+        flux-weighted velocity/dispersion moment maps of ``IFUMomentLikelihood``
+        -- IFU only, kept for comparison; its estimator has a noise bias at low
+        S/N (see the module docstring).
     lsf_sigma : Quantity (velocity), optional
         Moment estimator only.
     snr_threshold : float

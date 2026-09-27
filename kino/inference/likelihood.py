@@ -35,6 +35,7 @@ import numpy as np
 from kino.analysis.moments import MomentMaps, compute_moment_maps
 from kino.galaxy import DiscGalaxy
 from kino.instruments.ifu import IFU
+from kino.instruments.slit import SlitSpectrograph
 from kino.io.base import Datacube
 from kino.lensing import apply_shear
 
@@ -42,6 +43,40 @@ from kino.lensing import apply_shear
 #: expected counts and read noise are both ~0 (a far wing of a noiseless test cube) carries no
 #: information, and 1/0 would poison the sum.
 VARIANCE_FLOOR = 1e-3
+
+
+def _scene_from_params(fixed_galaxy_params: dict, params: dict):
+    """Build a sheared ``DiscGalaxy`` from ``fixed_galaxy_params`` overridden by any
+    ``GALAXY_FIELDS`` entry in ``params``, sheared by ``params``'s ``g1``/``g2``
+    (0 if absent). Shared by every likelihood in this module -- instrument-agnostic."""
+    galaxy_kwargs = dict(fixed_galaxy_params)
+    for key, value in params.items():
+        if key in GALAXY_FIELDS:
+            galaxy_kwargs[key] = value
+    galaxy = DiscGalaxy(**galaxy_kwargs)
+    return apply_shear(galaxy, params.get("g1", 0.0), params.get("g2", 0.0))
+
+
+def _resolve_line_flux(
+    params: dict, fixed_line_flux: u.Quantity | None, line_flux_unit: u.UnitBase | None
+) -> u.Quantity | None:
+    """``params["line_flux"]`` (with a unit attached) or ``fixed_line_flux``; ``None``
+    if unresolvable (the caller should then return ``-inf`` rather than raising, since
+    this runs inside a sampler's per-trial call)."""
+    line_flux = params.get("line_flux")
+    if line_flux is None:
+        if fixed_line_flux is None:
+            raise ValueError("line_flux must be free (in params) or fixed_line_flux set")
+        return fixed_line_flux
+    if isinstance(line_flux, u.Quantity):
+        return line_flux
+    if line_flux_unit is None:
+        raise ValueError(
+            "line_flux is free but line_flux_unit (or fixed_line_flux, to infer "
+            "the unit from) was not set"
+        )
+    return line_flux * line_flux_unit
+
 
 #: DiscGalaxy constructor fields a likelihood may treat as free or fixed.
 GALAXY_FIELDS = (
@@ -157,14 +192,7 @@ class IFUMomentLikelihood:
             raise ValueError("no spaxel in `data` passes snr_threshold -- nothing to fit against")
 
     def _build_scene(self, params: dict):
-        galaxy_kwargs = dict(self.fixed_galaxy_params)
-        for key, value in params.items():
-            if key in GALAXY_FIELDS:
-                galaxy_kwargs[key] = value
-        galaxy = DiscGalaxy(**galaxy_kwargs)
-        g1 = params.get("g1", 0.0)
-        g2 = params.get("g2", 0.0)
-        return apply_shear(galaxy, g1, g2)
+        return _scene_from_params(self.fixed_galaxy_params, params)
 
     def __call__(self, params: dict) -> float:
         line_flux = params.get("line_flux")
@@ -277,26 +305,75 @@ class IFUCubeLikelihood:
         self._flux = np.asarray(self.data.flux, dtype=float)
 
     def _build_scene(self, params: dict):
-        return IFUMomentLikelihood._build_scene(self, params)
+        return _scene_from_params(self.fixed_galaxy_params, params)
 
     def __call__(self, params: dict) -> float:
-        line_flux = params.get("line_flux")
-        if line_flux is None:
-            if self.fixed_line_flux is None:
-                raise ValueError("line_flux must be free (in params) or fixed_line_flux set")
-            line_flux = self.fixed_line_flux
-        elif not isinstance(line_flux, u.Quantity):
-            if self.line_flux_unit is None:
-                raise ValueError(
-                    "line_flux is free but line_flux_unit (or fixed_line_flux, to infer "
-                    "the unit from) was not set"
-                )
-            line_flux = line_flux * self.line_flux_unit
+        line_flux = _resolve_line_flux(params, self.fixed_line_flux, self.line_flux_unit)
         try:
             scene = self._build_scene(params)
             model = self.ifu.observe(
                 scene, line_flux=line_flux, line_wavelength=self.line_wavelength, rng=None
             )
+        except ValueError:
+            return -np.inf
+        var = np.maximum(model.variance, VARIANCE_FLOOR)
+        chi2 = float(np.sum((self._flux - model.flux) ** 2 / var + np.log(var)))
+        if not np.isfinite(chi2):
+            return -np.inf
+        return -0.5 * chi2
+
+
+@dataclass
+class SlitCubeLikelihood:
+    """Voxel-level Gaussian log-likelihood of a slit spectrograph's dispersed spectrum.
+
+    The :class:`SlitSpectrograph` analogue of :class:`IFUCubeLikelihood`: every trial
+    parameter set is forward-modelled through the fixed ``slit`` (the companion
+    broadband image is discarded -- only ``SlitObservation.spectrum`` enters the fit)
+    and compared voxel by voxel with the same Gaussian likelihood, so slit losses
+    (a source wider than the slit, or a misaligned ``slit_pa``/``slit_offset``) are
+    inside the model exactly as they are inside the data, rather than a bias.
+
+    Parameters
+    ----------
+    slit : SlitSpectrograph
+        The fixed, known instrument the data was observed with.
+    line_wavelength : Quantity (wavelength)
+        Rest-frame line wavelength.
+    data : Datacube
+        ``SlitObservation.spectrum`` (or an equivalent real reduction), shape
+        ``(slit.n_wave, slit.n_spatial, 1)``, in electrons.
+    fixed_galaxy_params, fixed_line_flux, line_flux_unit
+        As for :class:`IFUMomentLikelihood`.
+    """
+
+    slit: SlitSpectrograph
+    line_wavelength: u.Quantity
+    data: Datacube
+    fixed_galaxy_params: dict = field(default_factory=dict)
+    fixed_line_flux: u.Quantity | None = None
+    line_flux_unit: u.UnitBase | None = None
+
+    def __post_init__(self) -> None:
+        if self.line_flux_unit is None and self.fixed_line_flux is not None:
+            self.line_flux_unit = self.fixed_line_flux.unit
+        expected = (self.slit.n_wave, self.slit.n_spatial, 1)
+        if self.data.flux.shape != expected:
+            raise ValueError(
+                f"data cube shape {self.data.flux.shape} != the instrument's {expected}"
+            )
+        self._flux = np.asarray(self.data.flux, dtype=float)
+
+    def _build_scene(self, params: dict):
+        return _scene_from_params(self.fixed_galaxy_params, params)
+
+    def __call__(self, params: dict) -> float:
+        line_flux = _resolve_line_flux(params, self.fixed_line_flux, self.line_flux_unit)
+        try:
+            scene = self._build_scene(params)
+            model = self.slit.observe(
+                scene, line_flux=line_flux, line_wavelength=self.line_wavelength, rng=None
+            ).spectrum
         except ValueError:
             return -np.inf
         var = np.maximum(model.variance, VARIANCE_FLOOR)

@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
 
 ### Added
 
+- **Slit/grism shear likelihood and forecast**: `kino.inference.likelihood.SlitCubeLikelihood`, the
+  `SlitSpectrograph` analogue of `IFUCubeLikelihood` (fits `SlitObservation.spectrum` voxel by
+  voxel; slit losses fall out of the same rendering the data went through). `shear_fisher`'s cube
+  estimator now duck-types over an `IFU` or a `SlitSpectrograph`, and `kino.analysis.forecast`
+  gained `forecast_slit`/`narrowed_slit` alongside a new `slit_sky_electron_rate`
+  (`kino.observing.skymodel`, per along-slit pixel: `pixel_area = pixel_scale * slit_width`).
+  `forecast_ifu`/`forecast_slit` now share one internal implementation; the shared return type was
+  renamed `IFUForecast` -> `TargetForecast`. `SlitSpectrograph` gained `baseline_electrons()`
+  (mirroring `IFU`'s). Validated the same way as the IFU case: maximum-likelihood ensembles on the
+  Goodman config recovered the injected shear unbiased with scatter matching the Fisher bound
+  (`notebooks/data/fisher_validation.json`, `mle_slit_cube`).
 - **SOAR Goodman config** (`kino/config/goodman.yaml`): real geometry, 930 l/mm dispersion/
   resolution, and red-camera read noise from NOIRLab's published pages. Its throughput was
   first a cross-instrument guess, then replaced with a **real measurement**:
@@ -202,6 +213,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
 
 ### Fixed
 
+- **`SlitSpectrograph.observe`'s companion broadband image** mis-broadcast a per-channel
+  (array-valued) `sky_electron_rate` (only a scalar rate worked); only exercised once
+  `slit_sky_electron_rate` was used to set it. Fixed by reusing `baseline_electrons()`'s correctly
+  shaped `(n_wave, 1, 1)` array for both the spectrum and the image.
 - **`compute_moment_maps` background estimate** (found by validating the shear forecast
   against injection-recovery): the default per-spaxel *median* background lands inside the
   line's wings when the line fills much of the spectral window, biasing `dispersion` and

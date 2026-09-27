@@ -58,18 +58,19 @@ Read it before making changes. Keep it up to date as the project evolves.
 > injected shear alongside a free inclination/`v_flat` -- deliberately
 > showing the shear posterior widened by the inclination-velocity
 > degeneracy rather than hiding it by fixing those parameters at truth.
-> A target-level forecast now exists end to end for the **IFU** case: spectrum
-> table -> line flux (`kino.io.spectrum`) -> night/moon/airmass/sky/extinction
+> A target-level forecast now exists end to end for **both the IFU and the slit** case:
+> spectrum table -> line flux (`kino.io.spectrum`) -> night/moon/airmass/sky/extinction
 > (`kino.observing`) -> Fisher shear precision against seeing
-> (`kino.analysis.fisher`/`forecast`; the default cube-level estimator is unbiased and
-> validated, but is a *perfect-model statistical* bound -- the primary forecast is that
-> idealised number, `intrinsic_sigma` an optional sensitivity comparison), with
-> `kino/config/sifs.yaml` for SOAR SIFS (sky, dark current and the 700R efficiency are still
-> unverified; see the file's header) and `kino/config/goodman.yaml` for SOAR Goodman (real
-> geometry/detector, but its throughput is a *derived fiducial* -- NOIRLab has not published
-> the red-camera curve -- see the file's header). No slit/grism likelihood or forecast yet
-> (`SlitSpectrograph` renders mocks; nothing fits them), and no near-infrared. Notebooks 08-10
-> showcase the IFU side.
+> (`kino.analysis.fisher`/`forecast_ifu`/`forecast_slit`; the default cube-level estimator is
+> unbiased and validated for both instruments, but is a *perfect-model statistical* bound --
+> the primary forecast is that idealised number, `intrinsic_sigma` an optional sensitivity
+> comparison), with `kino/config/sifs.yaml` for SOAR SIFS (sky, dark current and the 700R
+> efficiency are still unverified; see the file's header) and `kino/config/goodman.yaml` for
+> SOAR Goodman (real geometry/detector, throughput a real EG 21 standard-star measurement --
+> see the file's header for its own caveats). `SlitCubeLikelihood`
+> (`kino.inference`) is the slit analogue of `IFUCubeLikelihood`; there is no slit moment-map
+> likelihood (the moment one stays IFU-only) and no near-infrared. Notebooks 08-10 showcase
+> the IFU side; there is no slit-forecast notebook yet.
 
 ## What KINO is
 
@@ -213,19 +214,25 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   (`IFU.baseline_electrons()`), which needs no estimate and stays calibrated to
   ~1% against Monte Carlo at any window width. `IFUMomentLikelihood` and the
   forecast do this by default (`known_baseline=True`).
-- **IFU shear likelihoods (`kino.inference.likelihood`):** two, sharing one forward model.
-  **`IFUCubeLikelihood` is the one to use**: a voxel-level Gaussian likelihood
-  `-1/2 sum[(d-m)^2/v + ln v]` (variance floored at 1e-3 e-^2 so zero-noise test cubes don't divide
-  by zero) with no estimator in between. On many noise realisations its maximum-likelihood shear
-  was unbiased (~1e-4) and its scatter matched the Cramer-Rao bound at every per-spaxel S/N tested
-  (5 to ~100), with inclination, PA and `v_flat` free as well. It needs *nonzero read noise* to be
-  a sensible Gaussian model. **`IFUMomentLikelihood`** compares flux/Vlos/dispersion *moment maps*
-  and is kept for comparison: data moments are ratios of noisy sums while the model's are
-  noiseless, so the estimator has a noise bias of ~1 sigma per galaxy at per-spaxel S/N ~ 20 that
-  grows toward low S/N (an analytic second-order correction was tried and fails below S/N ~ 12; a
-  moment-based fit of the notebook-04 mock missed the truth by 3-5 sigma in every parameter). Do
-  not use it for a stacked shear. Both forward-model each trial through the *same*, fixed
-  `IFU.observe(..., rng=None)` used for the data -- never compare a rendered cube against an
+- **Shear likelihoods (`kino.inference.likelihood`):** three, sharing one forward model and two
+  common helpers (`_scene_from_params`, `_resolve_line_flux`). **The cube ones are the ones to
+  use**: `IFUCubeLikelihood` (IFU) and its slit analogue `SlitCubeLikelihood` (fits
+  `SlitObservation.spectrum` only -- the companion broadband image is a placement aid, never fit),
+  a voxel-level Gaussian likelihood `-1/2 sum[(d-m)^2/v + ln v]` (variance floored at 1e-3 e-^2 so
+  zero-noise test cubes don't divide by zero) with no estimator in between. On many noise
+  realisations its maximum-likelihood shear was unbiased (~1e-4 IFU, ~1e-4 slit) and its scatter
+  matched the Cramer-Rao bound at every per-spaxel S/N tested (5 to ~500), with inclination, PA and
+  `v_flat` free as well. Both need *nonzero read noise* to be a sensible Gaussian model. Slit
+  losses (a source wider than the slit, or a misaligned `slit_pa`/`slit_offset`) fall directly out
+  of `SlitSpectrograph.observe()`'s own rendering -- inside the model exactly as they are inside
+  the data, not a separate parameter. **`IFUMomentLikelihood`** (IFU only; there is no slit
+  moment-map likelihood) compares flux/Vlos/dispersion *moment maps* and is kept for comparison:
+  data moments are ratios of noisy sums while the model's are noiseless, so the estimator has a
+  noise bias of ~1 sigma per galaxy at per-spaxel S/N ~ 20 that grows toward low S/N (an analytic
+  second-order correction was tried and fails below S/N ~ 12; a moment-based fit of the notebook-04
+  mock missed the truth by 3-5 sigma in every parameter). Do not use it for a stacked shear. All
+  three forward-model each trial through the *same*, fixed instrument (`IFU`/`SlitSpectrograph`)
+  `.observe(..., rng=None)` used for the data -- never compare a rendered cube against an
   analytically-evaluated (un-PSF-smeared) model, or the fit is biased by exactly the beam-smearing
   amount. For the moment version the data's moment maps are computed once (`check_window=True`,
   real `snr_threshold`) and each model evaluation reuses `check_window=False`, `snr_threshold=0`,
@@ -236,7 +243,7 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   explicitly **toy, uncalibrated** Tully-Fisher prior (`tully_fisher_prior`, `TOY_TF_ALPHA = 4.0`)
   -- do not read numeric results from it as astrophysical predictions until it is replaced with a
   real calibration. `kino.inference.sampler.fit_shear` is a thin `nautilus` nested-sampling wrapper
-  returning a `Posterior` (equal-weighted samples + `log_z`). No slit/grism likelihood exists yet.
+  returning a `Posterior` (equal-weighted samples + `log_z`).
   Validation lives in `scripts/validate_fisher_forecast.py` (nested sampling),
   `scripts/validate_fisher_mle.py` (fast maximum-likelihood ensembles) and
   `notebooks/data/fisher_validation.json`; a pull far from 1 means the reported errors, and every
@@ -301,11 +308,16 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   Pachon, with no per-night aerosol variation and no cloud.
 - **Forecasts (`kino.analysis.fisher`, `kino.analysis.forecast`, `kino.io.spectrum`):**
   `shear_fisher` is a Fisher/Cramer-Rao bound on `(g1, g2)` through the same forward model as the
-  likelihoods. **Default estimator `"cube"`**: the bound of `IFUCubeLikelihood` (every voxel, so
-  flux image + kinematics; the line flux is a nuisance with a fractional prior; central
-  differences; a few seconds). Validated against maximum-likelihood fits on many noise
-  realisations (scatter / Fisher 0.9-1.3 with inclination, PA and `v_flat` free; bias consistent
-  with zero). `"moments"` is the bound of the moment likelihood, kept for comparison. It returns
+  likelihoods, and takes **either an `IFU` or a `SlitSpectrograph`** (duck-typed: `estimator="cube"`
+  works with both, dispatching to `IFUCubeLikelihood`'s or `SlitCubeLikelihood`'s bound; a
+  `SlitSpectrograph.observe()` result is unwrapped to its `.spectrum` internally).
+  **Default estimator `"cube"`**: every voxel, so flux image + kinematics; the line flux is a
+  nuisance with a fractional prior; central differences; a few seconds (IFU) to ~1 minute per point
+  for Goodman's finer, longer slit -- narrow the window first, see below. Validated against
+  maximum-likelihood fits on many noise realisations, for both instruments (scatter / Fisher
+  0.8-1.3 with inclination, PA and `v_flat` free; bias consistent with zero). `"moments"` is the
+  bound of the moment likelihood, **IFU only** (raises `AttributeError` for a slit -- there is no
+  slit moment likelihood to bound). It returns
   `sigma_fixed` (only the shear free) and `sigma_marginal` (nuisance parameters free under
   `DEFAULT_CUBE_PRIORS`: inc +/-5 deg, pa +/-2 deg, r_e +/-5%, Sersic n +/-0.3, v_flat +/-25% (toy
   TF), r_t +/-20%, centroid +/-0.05", sigma0 +/-20 km/s, line flux +/-5% -- *assumptions*, override
@@ -317,16 +329,22 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   future project applying this code, not to validating the pipeline itself -- 2026-09-27 user
   direction): the primary forecast KINO reports is the **idealised, statistical** S/N
   (`shear_snr_stat`), clearly labelled as such rather than blocked on a floor nobody has measured
-  yet. `forecast_ifu(..., intrinsic_sigma=...)` remains available for a *sensitivity* comparison
-  (no default) and `psf_error=` adds the shear bias from a wrong assumed PSF FWHM (the converged
-  Levenberg-Marquardt fit of the mis-specified model, not the linear formula, which is 2-3x off at
-  high S/N). `forecast_ifu` tiles this over `(time, seeing)` through a night: airmass, the sky
-  spectrum (`kino.observing.skymodel`), CTIO extinction on the line flux (off with
+  yet. `intrinsic_sigma=...` remains available for a *sensitivity* comparison (no default) and
+  `psf_error=` adds the shear bias from a wrong assumed PSF FWHM (the converged Levenberg-Marquardt
+  fit of the mis-specified model, not the linear formula, which is 2-3x off at high S/N).
+  `forecast_ifu`/`forecast_slit` tile this over `(time, seeing)` through a night: airmass, the sky
+  spectrum (`kino.observing.skymodel`; `ifu_sky_electron_rate` per spaxel, `slit_sky_electron_rate`
+  per along-slit pixel with `pixel_area = pixel_scale * slit_width`, matching the sky entering
+  through the slit's full width), CTIO extinction on the line flux (off with
   `include_extinction=False` if the throughput already includes the atmosphere), and the quoted
   500 nm/zenith seeing converted to the line's wavelength and airmass; the spectral window is
-  cropped to +/-`window_kms` (default 500) at the instrument's native dispersion. Limits: optical
-  only (sky library to 1 micron, extinction to 1.087 micron), IFU only, per galaxy (stack by
-  sqrt(N) only for the statistical part), and the Gaussian cube model needs nonzero read noise.
+  cropped to +/-`window_kms` (default 500) at the instrument's native dispersion
+  (`narrowed_ifu`/`narrowed_slit`) -- for Goodman's default (wide, MOS-derived) window this alone
+  is a ~7x speedup. Both wrap one shared, instrument-agnostic `_forecast` implementation and return
+  the same `TargetForecast`. `forecast_slit` rejects `estimator="moments"` outright (no slit moment
+  likelihood to wrap). Limits: optical only (sky library to 1 micron, extinction to 1.087 micron),
+  per galaxy (stack by sqrt(N) only for the statistical part), and the Gaussian cube model needs
+  nonzero read noise.
   `kino.io.spectrum.read_spectrum` is strict about units -- a flux column with no unit raises
   rather than assuming SDSS/DESI's 1e-17 -- and treats wavelengths as vacuum;
   `measure_line_flux` returns what the *aperture* collected (pass `aperture_correction` for the
