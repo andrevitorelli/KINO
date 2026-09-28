@@ -77,7 +77,13 @@ Read it before making changes. Keep it up to date as the project evolves.
 > value -- and finds, for that specific target (r_e=2.6" against a 1.0" slit), that the
 > per-exposure shear S/N is slit-loss-limited (stat S/N below ~3 across the whole range) and
 > that a 10% PSF-FWHM error biases the shear more than either the statistical error or the
-> assumed 0.03 floor -- a real result, not generalisable to Goodman/KL as such.
+> assumed 0.03 floor -- a real result, not generalisable to Goodman/KL as such. It also picks
+> the cluster's lens redshift by *maximising* the SIS shear at a configurable reference radius
+> for a configurable mass/source redshift (`M200`/`Z_SOURCE`/`R_REF`), compares Goodman against
+> SIFS on the same real target (SIFS wins ~4-5x, partly from its own unmodelled-sky caveat), and
+> plots position-velocity/rotation-curve diagrams in the style of Pranjal R. S. et al. (2024,
+> arXiv:2409.08367) -- which surfaced that aligning the slit with the disc's major axis recovers
+> real S/N the rest of the notebook's default `slit_pa=0` throws away.
 
 ## What KINO is
 

@@ -45,7 +45,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
   PSF-FWHM error biases the shear more than either the statistical error or the assumed 0.03
   intrinsic floor -- a genuine, target-specific result, not evidence about Goodman/KL in
   general. Includes SDSS spectrum FITS (`notebooks/data/sdss_j2208_2878-54465-0462.fits`) for
-  reproducibility.
+  reproducibility. Extended: the shear range is now picked by choosing the lens redshift that
+  *maximises* the SIS shear at a configurable reference radius, for a configurable cluster mass
+  and source redshift (`M200`/`Z_SOURCE`/`R_REF`), rather than a fixed lens/source pair -- with
+  an inline comparison against an Abell-2261-mass (9.5e14 Msun) cluster at the same radius,
+  which reaches ~4.5x higher shear. Added a Goodman-vs-SIFS comparison on the same real target
+  and exposure budget (SIFS wins by ~4-5x, partly because `sifs.yaml` has no sky background
+  modelled yet -- a documented, flagged caveat, not a fair like-for-like number). Added
+  position-velocity/rotation-curve plots (Goodman 1D, SIFS 2D) in the style of Pranjal R. S. et
+  al. (2024, arXiv:2409.08367) Figure 5, which also surfaced a real, useful finding: aligning
+  the slit with the disc's own major axis (`slit_pa = gal.pa`) recovers real S/N that the rest of
+  the notebook's default `slit_pa=0` throws away on top of the pure aperture loss.
 
 - **Phase 0 — project setup**: git repository initialised; MIT `LICENSE`;
   GitHub Actions CI (lint + test matrix, Python 3.10-3.12); pre-commit config;
