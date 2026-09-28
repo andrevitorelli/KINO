@@ -55,7 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
   position-velocity/rotation-curve plots (Goodman 1D, SIFS 2D) in the style of Pranjal R. S. et
   al. (2024, arXiv:2409.08367) Figure 5, which also surfaced a real, useful finding: aligning
   the slit with the disc's own major axis (`slit_pa = gal.pa`) recovers real S/N that the rest of
-  the notebook's default `slit_pa=0` throws away on top of the pure aperture loss.
+  the notebook's default `slit_pa=0` throws away on top of the pure aperture loss. Also reports
+  the target's whole-galaxy apparent magnitude: extinction-corrected SDSS `cModelMag` in $ugriz$
+  (native AB system, $g=17.26$, $r=17.00$, $i=16.97$) plus a Johnson $V=17.11$ via the standard
+  SDSS-to-Johnson transform (Lupton 2005).
 
 - **Phase 0 — project setup**: git repository initialised; MIT `LICENSE`;
   GitHub Actions CI (lint + test matrix, Python 3.10-3.12); pre-commit config;
