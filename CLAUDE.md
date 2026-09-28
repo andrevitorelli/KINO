@@ -83,7 +83,9 @@ Read it before making changes. Keep it up to date as the project evolves.
 > SIFS on the same real target (SIFS wins ~4-5x, partly from its own unmodelled-sky caveat), and
 > plots position-velocity/rotation-curve diagrams in the style of Pranjal R. S. et al. (2024,
 > arXiv:2409.08367) -- which surfaced that aligning the slit with the disc's major axis recovers
-> real S/N the rest of the notebook's default `slit_pa=0` throws away.
+> real S/N the rest of the notebook's default `slit_pa=0` throws away. It also demonstrates
+> `shear_fisher_multi` (splitting the same exposure across two guessed slit position angles beats
+> betting it all on one, by 1.22x for this target's 30-degree single-guess misalignment).
 
 ## What KINO is
 
@@ -357,7 +359,18 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   the same `TargetForecast`. `forecast_slit` rejects `estimator="moments"` outright (no slit moment
   likelihood to wrap). Limits: optical only (sky library to 1 micron, extinction to 1.087 micron),
   per galaxy (stack by sqrt(N) only for the statistical part), and the Gaussian cube model needs
-  nonzero read noise.
+  nonzero read noise. `kino.analysis.fisher.shear_fisher_multi` generalises the cube estimator to
+  **several independent exposures of the same galaxy** (e.g. a slit revisited at a few position
+  angles/offsets to cover more of its velocity field than one misaligned slit would, or repeat
+  visits): each exposure's own voxel-level Fisher information is summed before the shared
+  nuisance priors are applied once (not per exposure). Validated by construction (two identical
+  half-exposures reproduce one full exposure to <1% on the shear sub-block) and by the standard
+  Fisher-information monotonicity argument (more independent information can only shrink the
+  marginal covariance, never grow it) -- not yet validated against real MLE ensembles the way the
+  single-exposure estimators are, since that needs a joint multi-exposure likelihood that does not
+  exist yet. Does not support `psf_error`/`psf_bias` or the moment estimator, and there is no
+  `forecast_slit`/`forecast_ifu`-level (time/seeing-tiled) wrapper for it yet -- it is Fisher-level
+  only, called directly with a list of already-configured instruments.
   `kino.io.spectrum.read_spectrum` is strict about units -- a flux column with no unit raises
   rather than assuming SDSS/DESI's 1e-17 -- and treats wavelengths as vacuum;
   `measure_line_flux` returns what the *aperture* collected (pass `aperture_correction` for the

@@ -39,6 +39,12 @@ comes out 1e-3-1e-2 per galaxy for bright targets. Real galaxies have non-circul
 thickness, warps, an uncertain PSF; that sets a floor the bound ignores. Add one with
 ``forecast_ifu(intrinsic_sigma=...)`` and ``psf_error=``. The bound is also a local, Gaussian
 approximation: it says nothing about multi-modal posteriors.
+
+:func:`shear_fisher_multi` generalises the cube estimator to **several independent exposures of
+the same galaxy** -- e.g. a slit visited at a few position angles/offsets to cover more of its
+velocity field, rather than one exposure at a single, possibly misaligned, position angle. Each
+exposure's own voxel-level Fisher information is summed before the shared nuisance priors are
+applied once. It does not (yet) support ``psf_error`` or the moment estimator.
 """
 
 from __future__ import annotations
@@ -272,41 +278,11 @@ _VARIANCE_FLOOR = 1e-3  # electrons^2; see kino.inference.likelihood.VARIANCE_FL
 _CUBE_STEPS = {**DEFAULT_STEPS, "sersic_n": 0.05, "r_t": 0.02}
 
 
-def _shear_fisher_cube(
-    ifu,
-    galaxy: DiscGalaxy,
-    *,
-    line_flux: u.Quantity,
-    line_wavelength: u.Quantity,
-    g: tuple[float, float],
-    snr_threshold: float,
-    priors: dict[str, float | None] | None,
-    steps: dict[str, float] | None,
-    free: list[str] | None,
-    psf_error: float | None,
-) -> FisherResult:
-    """Voxel-level Fisher matrix: ``F_ij = sum_voxels dmu_i dmu_j (1/var + 1/(2 var^2))``.
-
-    ``mu`` is the model cube (expected electrons, sky + dark baseline included)
-    and ``var = mu + read noise^2`` its variance, so this is the Cramer-Rao bound
-    of the exact Gaussian/Poisson cube likelihood. It uses every voxel -- flux,
-    velocity *and* dispersion information at once, with no moment-map estimator
-    (whose noise bias is what limits the moment version). The line flux enters as a
-    multiplicative factor with a fractional prior (a spectrum measures it to a few
-    per cent); its derivative is analytic (the source part of the cube scales with it).
-
-    Works with either an IFU or a SlitSpectrograph (duck-typed: both expose ``.psf``,
-    ``.observe()`` and ``.baseline_electrons()``; a SlitSpectrograph's ``.observe()``
-    result is unwrapped to its ``.spectrum`` before use).
-
-    ``psf_error``: the shear bias when the fit assumes ``ifu.psf`` but the data have a
-    FWHM larger by that fraction. It is the converged Levenberg-Marquardt solution of
-    the mis-specified fit (data rendered with the wrong PSF, fitted with the assumed
-    one, priors included), not the linear formula ``F^-1 J^T W dm``, which is off by
-    2-3x at high S/N where the mismatch is many sigma.
-    """
-    priors = {**DEFAULT_CUBE_PRIORS, **(priors or {})}
-    steps = {**_CUBE_STEPS, **(steps or {})}
+def _cube_names_and_theta0(galaxy, g, priors, free):
+    """Shared parameter bookkeeping for the cube estimator, single- or multi-exposure:
+    the nuisance-parameter list (in prior order, optionally restricted by ``free``) and
+    the fiducial parameter vector (shear, galaxy fields, ``line_flux`` as a multiplicative
+    factor starting at 1)."""
     base = {f: getattr(galaxy, f) for f in GALAXY_FIELDS}
     nuisance = [p for p in priors if p in GALAXY_FIELDS or p == "line_flux"]
     if free is not None:
@@ -315,12 +291,15 @@ def _shear_fisher_cube(
             raise ValueError(f"free parameters not in the prior set: {unknown}")
         nuisance = [p for p in nuisance if p in free]
     names = ["g1", "g2", *nuisance]
-    baseline = ifu.baseline_electrons()
-
-    # parameter vector: shear, galaxy fields, and ``line_flux`` as a multiplicative factor
     theta0 = np.array([g[0], g[1]] + [1.0 if n == "line_flux" else base[n] for n in names[2:]])
+    return base, names, theta0
 
-    def render(instrument, theta):
+
+def _cube_render_fn(instrument, base, names, line_flux, line_wavelength):
+    """A ``render(theta) -> Datacube`` closure for one instrument/galaxy/line, shared by
+    the single- and multi-exposure cube Fisher forecasts and the PSF-bias fit."""
+
+    def render(theta):
         kwargs = dict(base)
         factor = 1.0
         for n, v in zip(names[2:], theta[2:], strict=True):
@@ -338,47 +317,53 @@ def _shear_fisher_cube(
         # (the companion broadband image is a placement aid, not photometrically fit)
         return getattr(result, "spectrum", result)
 
-    def step_for(k):
-        n = names[k]
-        if n in ("g1", "g2") or n == "line_flux":
-            return steps.get(n, 0.005) if n != "line_flux" else 0.01
-        h = steps.get(n, 0.02)
-        return h * theta0[k] if n in _FRACTIONAL_CUBE else h
+    return render
 
-    def jacobian(instrument, theta):
-        cube = render(instrument, theta)
-        signal = cube.flux - baseline
-        cols = []
-        for k, n in enumerate(names):
-            if n == "line_flux":
-                cols.append(signal / theta[k])  # d mu / d factor
-                continue
-            h = step_for(k)
-            tp, tm = theta.copy(), theta.copy()
-            tp[k] += h
-            tm[k] -= h
-            cols.append((render(instrument, tp).flux - render(instrument, tm).flux) / (2 * h))
-        return cube, cols
 
-    fid, derivs = jacobian(ifu, theta0)
-    mu, var = fid.flux, np.maximum(fid.variance, _VARIANCE_FLOOR)
-    signal = mu - baseline
-    spaxel_snr = signal.sum(axis=0) / np.sqrt(var.sum(axis=0))
-    used = spaxel_snr >= snr_threshold
-    if not used.any():
-        raise ValueError("no spaxel passes the flux S/N threshold -- the target is undetectable")
+def _cube_step_for(k, names, theta0, steps):
+    n = names[k]
+    if n in ("g1", "g2"):
+        return steps.get(n, 0.005)
+    if n == "line_flux":
+        return 0.01
+    h = steps.get(n, 0.02)
+    return h * theta0[k] if n in _FRACTIONAL_CUBE else h
 
-    def information(cols, variance):
-        variance = np.maximum(variance, _VARIANCE_FLOOR)
-        w = 1.0 / variance + 0.5 / variance**2
-        n = len(cols)
-        f = np.zeros((n, n))
-        for i in range(n):
-            for j in range(i, n):
-                f[i, j] = f[j, i] = float(np.sum(cols[i] * cols[j] * w))
-        return f, w
 
-    fisher, weight = information(derivs, var)
+def _cube_jacobian(instrument, base, names, theta0, line_flux, line_wavelength, steps):
+    """One exposure's fiducial cube and Jacobian columns (``d mu / d theta_k``), by
+    central differences (analytic for ``line_flux``). Shared by the single- and
+    multi-exposure cube Fisher forecasts."""
+    render = _cube_render_fn(instrument, base, names, line_flux, line_wavelength)
+    baseline = instrument.baseline_electrons()
+    fid = render(theta0)
+    cols = []
+    for k, n in enumerate(names):
+        if n == "line_flux":
+            cols.append((fid.flux - baseline) / theta0[k])  # d mu / d factor
+            continue
+        h = _cube_step_for(k, names, theta0, steps)
+        tp, tm = theta0.copy(), theta0.copy()
+        tp[k] += h
+        tm[k] -= h
+        cols.append((render(tp).flux - render(tm).flux) / (2 * h))
+    return fid, cols, baseline, render
+
+
+def _cube_information(cols, variance):
+    """``F_ij = sum_voxels dmu_i dmu_j (1/var + 1/(2 var^2))`` -- the Cramer-Rao bound of
+    the Gaussian cube likelihood, for one exposure's Jacobian columns and variance."""
+    variance = np.maximum(variance, _VARIANCE_FLOOR)
+    w = 1.0 / variance + 0.5 / variance**2
+    n = len(cols)
+    f = np.zeros((n, n))
+    for i in range(n):
+        for j in range(i, n):
+            f[i, j] = f[j, i] = float(np.sum(cols[i] * cols[j] * w))
+    return f
+
+
+def _invert_with_priors(fisher, names, theta0, priors):
     n = len(names)
     prior_precision = np.zeros(n)
     for k, name in enumerate(names):
@@ -390,19 +375,67 @@ def _shear_fisher_cube(
     ridge = 1e-12 * np.trace(fisher) / n
     cov = np.linalg.inv(fisher + np.diag(prior_precision) + ridge * np.eye(n))
     fixed = np.linalg.inv(fisher[:2, :2] + ridge * np.eye(2))
+    return cov, fixed, prior_precision
+
+
+def _shear_fisher_cube(
+    ifu,
+    galaxy: DiscGalaxy,
+    *,
+    line_flux: u.Quantity,
+    line_wavelength: u.Quantity,
+    g: tuple[float, float],
+    snr_threshold: float,
+    priors: dict[str, float | None] | None,
+    steps: dict[str, float] | None,
+    free: list[str] | None,
+    psf_error: float | None,
+) -> FisherResult:
+    """Voxel-level Fisher matrix for one exposure (see :func:`shear_fisher`'s docstring
+    for the estimator itself; :func:`shear_fisher_multi` generalises this to several
+    independent exposures of the same galaxy).
+
+    Works with either an IFU or a SlitSpectrograph (duck-typed: both expose ``.psf``,
+    ``.observe()`` and ``.baseline_electrons()``; a SlitSpectrograph's ``.observe()``
+    result is unwrapped to its ``.spectrum`` before use).
+
+    ``psf_error``: the shear bias when the fit assumes ``ifu.psf`` but the data have a
+    FWHM larger by that fraction. It is the converged Levenberg-Marquardt solution of
+    the mis-specified fit (data rendered with the wrong PSF, fitted with the assumed
+    one, priors included), not the linear formula ``F^-1 J^T W dm``, which is off by
+    2-3x at high S/N where the mismatch is many sigma.
+    """
+    priors = {**DEFAULT_CUBE_PRIORS, **(priors or {})}
+    steps = {**_CUBE_STEPS, **(steps or {})}
+    base, names, theta0 = _cube_names_and_theta0(galaxy, g, priors, free)
+
+    fid, derivs, baseline, render = _cube_jacobian(
+        ifu, base, names, theta0, line_flux, line_wavelength, steps
+    )
+    mu, var = fid.flux, np.maximum(fid.variance, _VARIANCE_FLOOR)
+    signal = mu - baseline
+    spaxel_snr = signal.sum(axis=0) / np.sqrt(var.sum(axis=0))
+    used = spaxel_snr >= snr_threshold
+    if not used.any():
+        raise ValueError("no spaxel passes the flux S/N threshold -- the target is undetectable")
+
+    fisher = _cube_information(derivs, var)
+    n = len(names)
+    cov, fixed, prior_precision = _invert_with_priors(fisher, names, theta0, priors)
 
     psf_bias = (float("nan"), float("nan"))
     if psf_error is not None:
         wrong = dataclasses.replace(
             ifu, psf=dataclasses.replace(ifu.psf, seeing_fwhm=ifu.psf.seeing_fwhm * (1 + psf_error))
         )
-        data = render(wrong, theta0).flux  # the truth, seen through the larger PSF
-        scale = np.array([step_for(k) for k in range(n)])
+        wrong_render = _cube_render_fn(wrong, base, names, line_flux, line_wavelength)
+        data = wrong_render(theta0).flux  # the truth, seen through the larger PSF
+        scale = np.array([_cube_step_for(k, names, theta0, steps) for k in range(n)])
         root_prior = np.sqrt(prior_precision)
 
         def residuals(x):
             theta = theta0 + x * scale
-            cube = render(ifu, theta)
+            cube = render(theta)
             return np.concatenate(
                 [
                     ((data - cube.flux) / np.sqrt(cube.variance)).ravel(),
@@ -428,6 +461,102 @@ def _shear_fisher_cube(
         median_spaxel_snr=float(np.median(spaxel_snr[used])),
         psf_bias=psf_bias,
         meta={"estimator": "cube"},
+    )
+
+
+def shear_fisher_multi(
+    instruments: list,
+    galaxy: DiscGalaxy,
+    *,
+    line_flux: u.Quantity,
+    line_wavelength: u.Quantity,
+    g: tuple[float, float] = (0.0, 0.0),
+    snr_threshold: float = 3.0,
+    priors: dict[str, float | None] | None = None,
+    steps: dict[str, float] | None = None,
+    free: list[str] | None = None,
+) -> FisherResult:
+    """Cube-estimator Fisher forecast for **several independent exposures of the same
+    galaxy** -- e.g. a slit visited at a few different position angles or offsets to
+    cover more of its velocity field, or repeat visits on different nights.
+
+    Each exposure's own voxel-level Fisher information (statistically independent noise
+    realisations of the *same* underlying galaxy/shear) is summed before the shared
+    nuisance priors are applied **once**, not once per exposure -- the priors describe
+    the one true galaxy, not each observation of it:
+
+    ``F_total = sum_k F_k``, then ``cov = (F_total + prior precision)^-1``.
+
+    Parameters
+    ----------
+    instruments : list of IFU or SlitSpectrograph
+        Two or more instruments, each with its own exposure time/sky/PSF/slit geometry
+        already set (e.g. different ``slit_pa`` values -- split a fixed total time
+        budget across them yourself, such as ``exposure_time`` scaled by ``1/len(...)``
+        on each). All observe the *same* galaxy and shear point; parameter names/steps
+        are shared, so a duck-typing mismatch (mixing an IFU and a SlitSpectrograph) is
+        allowed as long as both expose the same ``.observe()``/``.baseline_electrons()``
+        API used by :func:`shear_fisher`.
+    line_flux, line_wavelength, g, snr_threshold, priors, steps, free
+        As in :func:`shear_fisher`.
+
+    Returns
+    -------
+    FisherResult
+        ``n_spaxels`` is summed across exposures; ``median_spaxel_snr``/
+        ``peak_spaxel_snr`` are computed over the pooled per-spaxel S/N of every
+        exposure's used spaxels; ``line_snr`` combines each exposure's own whole-field
+        S/N in quadrature (exact only if every exposure captures the same total flux,
+        which need not hold for different slit position angles on an inclined disc --
+        treat it as a descriptive summary, not something the covariance depends on).
+
+    Notes
+    -----
+    Only the cube estimator generalises simply to several exposures (the moment
+    estimator's per-exposure noise bias does not combine this way) and ``psf_error``/
+    ``psf_bias`` is not supported yet (always NaN) -- extending the joint
+    mis-specified-PSF fit to several exposures is future work, not implemented here.
+    """
+    if not instruments:
+        raise ValueError("instruments must be non-empty")
+    priors = {**DEFAULT_CUBE_PRIORS, **(priors or {})}
+    steps = {**_CUBE_STEPS, **(steps or {})}
+    base, names, theta0 = _cube_names_and_theta0(galaxy, g, priors, free)
+    n = len(names)
+
+    fisher_total = np.zeros((n, n))
+    n_used = 0
+    snr_pool: list[np.ndarray] = []
+    line_snr_sq = 0.0
+    for instrument in instruments:
+        fid, cols, baseline, _ = _cube_jacobian(
+            instrument, base, names, theta0, line_flux, line_wavelength, steps
+        )
+        var = np.maximum(fid.variance, _VARIANCE_FLOOR)
+        signal = fid.flux - baseline
+        spaxel_snr = signal.sum(axis=0) / np.sqrt(var.sum(axis=0))
+        used = spaxel_snr >= snr_threshold
+        if used.any():
+            n_used += int(used.sum())
+            snr_pool.append(spaxel_snr[used])
+        fisher_total += _cube_information(cols, var)
+        line_snr_sq += float(signal.sum() ** 2 / var.sum())
+
+    if n_used == 0:
+        raise ValueError("no spaxel passes the flux S/N threshold -- the target is undetectable")
+    pooled_snr = np.concatenate(snr_pool)
+
+    cov, fixed, _ = _invert_with_priors(fisher_total, names, theta0, priors)
+    return FisherResult(
+        sigma_fixed=(float(np.sqrt(fixed[0, 0])), float(np.sqrt(fixed[1, 1]))),
+        sigma_marginal=(float(np.sqrt(cov[0, 0])), float(np.sqrt(cov[1, 1]))),
+        covariance=cov,
+        param_names=names,
+        n_spaxels=n_used,
+        line_snr=float(np.sqrt(line_snr_sq)),
+        peak_spaxel_snr=float(np.max(pooled_snr)),
+        median_spaxel_snr=float(np.median(pooled_snr)),
+        meta={"estimator": "cube", "n_exposures": len(instruments)},
     )
 
 

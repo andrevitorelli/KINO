@@ -4,10 +4,16 @@ import astropy.units as u
 import numpy as np
 import pytest
 
-from kino.analysis.fisher import DEFAULT_CUBE_PRIORS, DEFAULT_PRIORS, shear_fisher
+from kino.analysis.fisher import (
+    DEFAULT_CUBE_PRIORS,
+    DEFAULT_PRIORS,
+    shear_fisher,
+    shear_fisher_multi,
+)
 from kino.galaxy import DiscGalaxy
 from kino.instruments.base import LSF, PSF, Detector, Throughput
 from kino.instruments.ifu import IFU
+from kino.instruments.slit import SlitSpectrograph
 
 LINE_WAVELENGTH = 1.1 * u.um
 LINE_FLUX = 5e-15 * u.erg / u.s / u.cm**2
@@ -34,6 +40,20 @@ def fisher(ifu=None, **kw):
     return shear_fisher(
         ifu or make_ifu(), DiscGalaxy(**GAL), line_wavelength=LINE_WAVELENGTH, g=G, **kw
     )
+
+
+def make_slit(**kw) -> SlitSpectrograph:
+    base = dict(
+        slit_width=1.0 * u.arcsec, pixel_scale=0.15 * u.arcsec, n_spatial=20,
+        wavelength_min=1.098 * u.um, wavelength_max=1.102 * u.um, n_wave=24,
+        psf=PSF(seeing_fwhm=0.5 * u.arcsec), lsf=LSF(resolving_power=8000.0),
+        throughput=Throughput(wavelength=[1.0, 1.2] * u.um, transmission=[1.0, 1.0]),
+        aperture_diameter=10 * u.m,
+        detector=Detector(read_noise=2 * u.electron, dark_current=0 * u.electron / u.s),
+        exposure_time=600 * u.s, sky_electron_rate=0.5 * u.electron / u.s,
+    )  # fmt: skip
+    base.update(kw)
+    return SlitSpectrograph(**base)
 
 
 class TestShearFisher:
@@ -223,3 +243,74 @@ class TestSlitInstrument:
         )  # fmt: skip
         assert np.all(np.isfinite(r.psf_bias))
         assert np.hypot(*r.psf_bias) > 0
+
+
+class TestShearFisherMulti:
+    """Several independent exposures of the *same* galaxy (e.g. different slit position
+    angles covering more of its velocity field), Fisher-summed before applying the
+    nuisance priors once."""
+
+    def multi(self, instruments, **kw):
+        kw.setdefault("line_flux", LINE_FLUX)
+        return shear_fisher_multi(
+            instruments, DiscGalaxy(**GAL), line_wavelength=LINE_WAVELENGTH, g=G, **kw
+        )
+
+    def test_two_identical_half_exposures_match_one_full_exposure(self):
+        # splitting a fixed time budget across two identical setups and summing their
+        # Fisher information must reproduce one exposure with the full budget, up to the
+        # tiny difference from _VARIANCE_FLOOR clipping a few voxels differently at half
+        # the signal (not exact bit-for-bit, but agreement well under 1%)
+        full = fisher(make_ifu(exposure_time=600 * u.s))
+        halves = [make_ifu(exposure_time=300 * u.s), make_ifu(exposure_time=300 * u.s)]
+        r = self.multi(halves)
+        assert r.sigma_fixed[0] == pytest.approx(full.sigma_fixed[0], rel=1e-2)
+        assert r.sigma_marginal[0] == pytest.approx(full.sigma_marginal[0], rel=1e-2)
+        # the shear sub-block, which is what's actually reported/used; nuisance-parameter
+        # cross-terms (e.g. sigma0) can differ by more in relative terms since the floor
+        # clips a few voxels' variance differently at half the signal, without affecting
+        # the shear precision itself
+        assert r.covariance[:2, :2] == pytest.approx(full.covariance[:2, :2], rel=1e-2)
+
+    def test_two_different_position_angles_help_the_marginal_precision(self):
+        # a single misaligned slit vs. the same total time split across two different
+        # position angles -- more independent information about (inc, pa, v_flat)
+        # can only shrink (never grow) the marginal shear covariance
+        one = [make_slit(slit_pa=0.0, exposure_time=600 * u.s)]
+        two = [
+            make_slit(slit_pa=0.0, exposure_time=300 * u.s),
+            make_slit(slit_pa=90.0, exposure_time=300 * u.s),
+        ]
+        kw = dict(free=["inc", "pa", "v_flat"], priors={"inc": 20.0, "pa": 20.0, "v_flat": 0.5})
+        r_one = self.multi(one, **kw)
+        r_two = self.multi(two, **kw)
+        assert r_two.sigma_marginal[0] <= r_one.sigma_marginal[0] + 1e-9
+        assert r_two.sigma_marginal[1] <= r_one.sigma_marginal[1] + 1e-9
+
+    def test_requires_at_least_one_instrument(self):
+        with pytest.raises(ValueError, match="non-empty"):
+            self.multi([])
+
+    def test_meta_reports_the_exposure_count_and_estimator(self):
+        r = self.multi([make_ifu(), make_ifu(), make_ifu()])
+        assert r.meta == {"estimator": "cube", "n_exposures": 3}
+
+    def test_psf_error_is_not_a_supported_argument(self):
+        with pytest.raises(TypeError):
+            self.multi([make_ifu()], psf_error=0.1)
+
+    def test_works_for_a_slit_too(self):
+        r = self.multi([make_slit(), make_slit(slit_pa=45.0)])
+        assert 0 < r.sigma_fixed[0] < 1
+        assert r.n_spaxels > 0
+
+    def test_an_undetectable_target_raises(self):
+        with pytest.raises(ValueError, match="undetectable"):
+            self.multi([make_ifu(), make_ifu()], line_flux=1e-20 * u.erg / u.s / u.cm**2)
+
+    def test_does_not_mutate_the_instruments(self):
+        a, b = make_ifu(), make_ifu()
+        before_a, before_b = dataclasses.replace(a), dataclasses.replace(b)
+        self.multi([a, b])
+        assert a == before_a
+        assert b == before_b

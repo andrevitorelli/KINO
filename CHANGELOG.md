@@ -30,6 +30,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
   own extinction/PSF slit-loss models, cross-checked in shape and magnitude against NOIRLab's
   published blue-camera 930/1200 l/mm curve. `tests/instruments/test_goodman_config.py` pins
   the measured values.
+- **`kino.analysis.fisher.shear_fisher_multi`**: generalises the cube-estimator Fisher forecast to
+  several *independent exposures of the same galaxy* -- e.g. a slit revisited at a few position
+  angles/offsets to cover more of its velocity field than one (possibly misaligned) slit would,
+  or repeat visits on different nights. Each exposure's own voxel-level Fisher information is
+  summed before the shared nuisance priors are applied once, not per exposure. Validated by
+  construction (two identical half-exposures reproduce one full exposure to <1% on the shear
+  sub-block) and by the standard Fisher-information monotonicity argument; not yet validated
+  against real MLE ensembles, since that needs a joint multi-exposure likelihood that does not
+  exist yet. Forecast-only for now: no `psf_error`/`psf_bias`, no moment estimator, and no
+  `forecast_slit`/`forecast_ifu`-level (time/seeing-tiled) wrapper.
 - **`notebooks/11_goodman_forecast.ipynb`**: the slit analogue of `10_sifs_forecast.ipynb`, using
   a real archival spectrum and a physically derived shear range instead of synthetic/fiducial
   ones. A real SDSS DR17 H-alpha spectrum (found via a SkyServer SQL query for a strong,
@@ -58,7 +68,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
   the notebook's default `slit_pa=0` throws away on top of the pure aperture loss. Also reports
   the target's whole-galaxy apparent magnitude: extinction-corrected SDSS `cModelMag` in $ugriz$
   (native AB system, $g=17.26$, $r=17.00$, $i=16.97$) plus a Johnson $V=17.11$ via the standard
-  SDSS-to-Johnson transform (Lupton 2005).
+  SDSS-to-Johnson transform (Lupton 2005). Added a demonstration of `shear_fisher_multi`: splitting
+  the same total exposure time across two orthogonal guessed slit position angles (rather than
+  betting it all on one) improves the marginal shear precision by 1.22x for this target's 30-degree
+  single-guess misalignment -- real, but modest, since a 30-degree offset is far from the
+  near-total loss a 90-degree one would cause.
 
 - **Phase 0 — project setup**: git repository initialised; MIT `LICENSE`;
   GitHub Actions CI (lint + test matrix, Python 3.10-3.12); pre-commit config;
