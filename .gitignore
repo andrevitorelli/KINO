@@ -19,3 +19,8 @@ dist/
 
 # local Claude Code permission state
 .claude/settings.local.json
+
+# telescope-time proposals (drafts, old submissions, possibly real target names) -- never
+# committed, see CLAUDE.md's "candidate target lists are private" rule
+/proposals/
+*.zip

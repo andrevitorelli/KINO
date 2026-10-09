@@ -1,0 +1,71 @@
+# SOAR Goodman High Throughput Spectrograph (red camera), single slit,
+# 930 l/mm grating, tuned to a REDDER central wavelength than goodman.yaml.
+#
+# UNLIKE goodman.yaml (whose throughput is a real EG 21 on-sky measurement,
+# 385-685nm), this config extends that measurement with a FIDUCIAL throughput
+# beyond 685nm, needed to reach Halpha for sources at z > ~0.044 -- the exact
+# gap this was built for (notebooks/11_goodman_forecast.ipynb's Section 1
+# deliberately picked a low-z target to avoid it; a real z~0.13-0.16 target
+# sample needs it). A fresh check (2026-10-09) for a published red-camera
+# efficiency curve at any grating, or an archival on-sky calibration exposure
+# redward of EG 21's, found nothing new (NOIRLab's own page still says
+# "results will be posted soon", as it did on 2026-09-27) -- see
+# scripts/derive_goodman_throughput.py's docstring for the full derivation
+# this extends. Kept as a SEPARATE config so goodman.yaml's real, measured,
+# test-pinned curve stays untouched.
+#
+# FIDUCIAL extension (not measured) -- replace before quoting any forecast:
+#   * Throughput beyond 685nm HOLDS the last measured value (0.160) flat out
+#     to 780nm, rather than extrapolating the measured curve's own decline
+#     (0.286 at 505nm falling to 0.160 at 685nm) further down. This is a
+#     deliberately conservative, not optimistic, choice, loosely supported by
+#     NOIRLab's own qualitative statement that the red camera's "response is
+#     roughly equal to the blue camera around 4500nm and better at redder
+#     wavelengths, with almost no fringing out to 9500nm" (Goodman Red Camera
+#     page, paraphrased from a search snippet, 2026-10-09 -- the page itself
+#     did not render via automated fetch at that time, so this is read as
+#     directional context, not a quoted or verified number). Treat any
+#     forecast through this config as an order-of-magnitude estimate only.
+#   * All other fields (geometry, detector, resolving power, PSF, exposure)
+#     are identical to goodman.yaml -- same instrument, same real sourcing,
+#     just copied here rather than imported to keep each config self-contained
+#     and independently diffable/pinnable.
+#
+# See goodman.yaml's own header for everything else's provenance and caveats
+# (grating mismatch in the EG 21 measurement, one star/one night scatter,
+# the slit-width-driven resolution idealisation).
+
+slit_width: "1.0 arcsec"        # one of Goodman's fixed long-slit widths
+pixel_scale: "0.15 arcsec"      # sourced: unbinned Goodman spectroscopic pixel scale
+n_spatial: 100                  # 100 * 0.15" = 15" -- per-target slit length, see header
+slit_pa: 0.0                    # degrees, East of North
+# slit_offset defaults to (0, 0) -- centred on the target
+margin: 10
+
+wavelength_min: "0.74 um"       # centred for Halpha at z ~ 0.13-0.16; override per target
+wavelength_max: "0.76 um"
+n_wave: 476                     # 0.42 A/pix (930 l/mm, sourced) over this 200 A window
+
+lsf:
+  resolving_power: 4450         # 930 l/mm grating, 550 nm, 0.46" slit (sourced) -- see goodman.yaml
+
+psf:
+  seeing_fwhm: "0.9 arcsec"     # ground-based, seeing-limited (no AO); sweep this, don't trust it
+
+throughput:
+  # 385-685nm: REAL, from the EG 21 standard-star exposure (see goodman.yaml).
+  # 715-780nm: FIDUCIAL, flat continuation of the last measured value -- see header.
+  wavelength: ["0.385 um", "0.415 um", "0.445 um", "0.475 um", "0.505 um", "0.535 um", "0.565 um", "0.595 um", "0.625 um", "0.655 um", "0.685 um", "0.715 um", "0.745 um", "0.78 um"]
+  transmission: [0.152, 0.284, 0.278, 0.274, 0.286, 0.278, 0.260, 0.239, 0.208, 0.179, 0.160, 0.160, 0.160, 0.160]
+
+aperture_diameter: "4.1 m"      # SOAR
+obstruction_fraction: 0.0       # already netted into throughput/effective diameter above
+
+detector:
+  read_noise: "3.89 electron"   # sourced: Goodman red camera, 344ATTN3 readout, 1x1 binning
+  dark_current: "0.001 electron / s"  # UNVERIFIED PLACEHOLDER -- no published value found
+
+exposure_time: "1200 s"
+n_exposures: 3                  # fiducial 1 hour total integration
+
+sky_electron_rate: "0 electron / s"   # PLACEHOLDER -- use kino.observing.skymodel at forecast time

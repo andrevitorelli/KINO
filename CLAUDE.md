@@ -394,7 +394,11 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   `tests/instruments/test_goodman_config.py` pins the exact values so a better measurement
   replacing them is a deliberate, visible change. Before adding another such config, look for
   the real number first; prefer a *measured proxy* (as here) over a cross-instrument guess, and
-  fall back to a documented fiducial only when neither exists.
+  fall back to a documented fiducial only when neither exists. `kino/config/goodman_red.yaml`/
+  `sifs_700r.yaml` are that fallback in practice: neither instrument has a measured throughput
+  redward of ~685-730nm (needed for Halpha above z ~ 0.11-0.13), so each extends its own real
+  curve with a flat, explicitly fiducial continuation, kept in a *separate* config file so the
+  real, measured, test-pinned originals are untouched.
 - **External-data readers (`kino.io.manga`, `kino.io.download`):** convert
   to KINO's conventions in the reader, not downstream (`TEST_DATA.md`
   Section 5) — but check each reader's own module docstring for which

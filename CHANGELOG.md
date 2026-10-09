@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
 
 ### Added
 
+- **`kino/config/goodman_red.yaml`, `kino/config/sifs_700r.yaml`**: redder-wavelength variants
+  of `goodman.yaml`/`sifs.yaml`, needed to reach Halpha above z ~ 0.11-0.13, where neither
+  instrument's real measured throughput extends (Goodman's EG 21 curve stops at 685nm; SIFS's
+  700M curve stops at 730nm). Both extend their real measured curve with a clearly-labelled
+  **fiducial** continuation (flat at the last measured value -- conservative, not optimistic),
+  checked (2026-10-09) against NOIRLab's current pages for a real measurement first and finding
+  none yet. Kept as separate configs so the real, measured, test-pinned `goodman.yaml`/`sifs.yaml`
+  stay untouched. `notebooks/12_redder_wavelength_configs.ipynb` validates both against a real
+  SDSS Halpha spectrum at z~0.15 (found by a blind query, unrelated to any candidate list).
+
 - **Slit/grism shear likelihood and forecast**: `kino.inference.likelihood.SlitCubeLikelihood`, the
   `SlitSpectrograph` analogue of `IFUCubeLikelihood` (fits `SlitObservation.spectrum` voxel by
   voxel; slit losses fall out of the same rendering the data went through). `shear_fisher`'s cube
