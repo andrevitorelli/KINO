@@ -1,12 +1,11 @@
 # KINO
 
-**KI**nematic lensing i**N**ference and mock-**O**bservations
+[K]ino [I]s [NO]t an accronym.*
 
-*(kino — from the Greek* kinema*, "movement" — a nod to the galaxy kinematics at the
-heart of the method.)*
+*(kino - the German word for cinema - from the Greek *kinema*, "movement")*
 
 KINO is a Python toolkit to **simulate** and **test the inference of kinematic
-lensing (KL)** — the measurement of weak gravitational shear from the distorted
+lensing (KL)** - the measurement of weak gravitational shear from the distorted
 velocity field of an individual disc galaxy. It is built to work across both
 observing modes used in the KL literature:
 
