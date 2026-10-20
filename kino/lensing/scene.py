@@ -77,5 +77,28 @@ class LensedScene:
 
 
 def apply_shear(galaxy, g1: float, g2: float) -> LensedScene:
-    """Apply reduced shear ``(g1, g2)`` to ``galaxy``'s image and velocity field."""
+    """Apply reduced shear ``(g1, g2)`` to ``galaxy``'s image and velocity field.
+
+    Thin constructor for :class:`LensedScene`: both the surface brightness
+    and the line-of-sight velocity field are remapped through the same
+    ``beta = A @ theta`` delensing transform (see :mod:`kino.lensing.shear`),
+    so shear never affects the image alone.
+
+    Parameters
+    ----------
+    galaxy : object
+        Anything exposing ``surface_brightness(x, y)``, ``vlos(x, y)``,
+        ``velocity_dispersion(x, y)``, ``x0``, ``y0`` (e.g. a
+        :class:`kino.galaxy.DiscGalaxy`). Treated as its own local lens
+        centre -- KINO does not model convergence/magnification or a
+        separate external lens position.
+    g1, g2 : float
+        Reduced shear components; ``g1**2 + g2**2`` must be ``< 1``.
+
+    Returns
+    -------
+    LensedScene
+        Wraps ``galaxy`` and evaluates it at the delensed coordinate for
+        each observed sky position.
+    """
     return LensedScene(galaxy=galaxy, g1=g1, g2=g2)

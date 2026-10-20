@@ -1,0 +1,89 @@
+# Gemini South GMOS IFU -- two-slit (full field) mode, R831 grating.
+#
+# Like sifs.yaml/goodman.yaml/keck_kcwi.yaml, numbers below are sourced where
+# published and marked; ANYTHING NOT LISTED AS SOURCED IS A PLACEHOLDER --
+# see "UNVERIFIED" below. Gemini South is used here (Cerro Pachon, the same
+# site as SOAR) rather than Gemini North, so the seeing fiducial below can
+# reuse a real, already-verified Pachon measurement.
+#
+# Sourced:
+#   * IFU two-slit (full field) mode: 0.2" lenslet sampling, 7" x 5" field,
+#     1000 object-light spaxels (plus separate sky fibres) -- Gemini GMOS
+#     factsheet and the original commissioning paper
+#     (https://webarchive.gemini.edu/sciops/instruments/gmos/gmosIFU.html).
+#     The IFU's effective slit width in the dispersion direction is 0.31",
+#     finer than the longslit's nominal 0.5" used for the lab R below.
+#     One-slit (half field, 3.5" x 5", 500 spaxels) trades field for
+#     extended simultaneous wavelength coverage -- not used here.
+#   * R831 grating: lab resolving power R=4396 at blaze 757 nm (0.5" slit),
+#     207 nm simultaneous coverage (Gemini GMOS gratings page,
+#     https://webarchive.gemini.edu/sciops/instruments/gmos/gmosGratings.html).
+#     Published IFU science papers quote a finer ~40 km/s resolution for this
+#     same grating (e.g. arXiv:astro-ph/0607054), plausibly from the IFU's
+#     narrower effective slit; the LSF below uses the conservative lab R.
+#   * Telescope: Gemini's 8-m f/1.8 primary (8.0 m clear aperture, 1.2 m
+#     central hole) with a 1.02 m secondary give an area obstruction of
+#     about 1.6% (computed here from Gemini design documents rpt-ps-g0064/
+#     g0067; no single published obstruction-fraction figure was found).
+#     Aperture quoted as the commonly-cited 8.1 m.
+#   * seeing_fwhm: 0.95" reuses the real Cerro Pachon speckle-camera median
+#     reported for SOAR (arXiv:2605.01487, 2024-2025, explicitly noted there
+#     as "worse than typical"; run medians 0.83-1.35") -- same mountain as
+#     Gemini South, not a GMOS-specific measurement. Sweep it, don't trust it.
+#
+# UNVERIFIED / PLACEHOLDER -- replace before quoting any forecast:
+#   * detector.read_noise: 4.0 e- is the mean of GMOS-S's own archived
+#     Hamamatsu gain/read-noise table (June 2014-Aug 2015 era, roughly
+#     3.8-4.3 e- across amplifiers in normal/slow/low-gain mode) -- Gemini's
+#     own page flags this table as superseded by a later controller-board fix.
+#     Check Gemini's current GMOS-S array table before trusting this number.
+#   * detector.dark_current: no GMOS-S figure was found; ~3 e-/hr/pix is
+#     GMOS-North's published Hamamatsu dark current, used here as a
+#     cross-instrument proxy (same detector family, different telescope),
+#     not a GMOS-S measurement.
+#   * throughput: no peak end-to-end efficiency figure was found for GMOS;
+#     the curve below is a generic fiducial (~20% peak, broad optical
+#     bandpass), typical of an 8-10 m telescope + grating spectrograph
+#     system, NOT a GMOS-measured curve.
+#   * sky_electron_rate is 0 (NO SKY BACKGROUND), same placeholder pattern as
+#     sifs.yaml/keck_kcwi.yaml: flatters every S/N number.
+#   * exposure_time / n_exposures are fiducial (a single ~1 hour block).
+#   * Lenslet geometry is modelled as square 0.2" spaxels (1000 real spaxels
+#     over a 7"x5" field is not a perfect square grid -- hexagonal packing is
+#     simplified away here, same type of approximation as sifs.yaml's fibres).
+#   * No AO: GMOS is seeing-limited (no optical-aberration terms set below).
+#   * wavelength_min/max/n_wave below are a narrow 10 nm window chosen only
+#     so the config runs quickly, centred on the R831 blaze wavelength; the
+#     per-pixel dispersion was not independently sourced, so n_wave is a
+#     round, illustrative value. Override the window (as notebook 04/10 do
+#     for SIFS) to bracket the redshifted line of an actual target.
+
+pixel_scale: "0.20 arcsec"
+nx: 35
+ny: 25
+
+wavelength_min: "0.7520 um"
+wavelength_max: "0.7620 um"
+n_wave: 400
+
+lsf:
+  fwhm: "1.722 angstrom"       # 7570 A / R=4396 (R831 grating, lab value)
+
+psf:
+  seeing_fwhm: "0.95 arcsec"
+
+throughput:
+  wavelength: ["0.360 um", "0.450 um", "0.550 um", "0.650 um", "0.750 um", "0.850 um", "0.950 um"]
+  transmission: [0.05, 0.14, 0.20, 0.20, 0.17, 0.10, 0.04]
+
+aperture_diameter: "8.1 m"
+obstruction_fraction: 0.016
+
+detector:
+  read_noise: "4.0 electron"            # PLACEHOLDER, superseded GMOS-S table, see header
+  dark_current: "0.000833 electron / s"  # PLACEHOLDER, GMOS-N proxy, see header
+
+exposure_time: "1200 s"
+n_exposures: 3                  # fiducial 1 hour total
+
+sky_electron_rate: "0 electron / s"   # PLACEHOLDER -- NO SKY, see header

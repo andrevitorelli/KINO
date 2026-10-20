@@ -1,0 +1,91 @@
+# VLT (UT4, Yepun) MUSE -- Wide Field Mode, nominal wavelength range.
+#
+# Like sifs.yaml/goodman.yaml/keck_kcwi.yaml/gemini_gmos_ifu.yaml, numbers
+# below are sourced where published and marked; ANYTHING NOT LISTED AS
+# SOURCED IS A PLACEHOLDER -- see "UNVERIFIED" below. MUSE is genuinely at
+# Paranal, so (unlike the SOAR/Gemini-South configs) kino.observing.skymodel's
+# Paranal-built sky library needs no cross-site correction for this instrument.
+#
+# Sourced:
+#   * WFM spatial sampling: 0.2"/spaxel over a 59.9" x 60.0" field, 24 IFUs
+#     each with a 4k x 4k MIT/LL CCD (ESO MUSE overview,
+#     https://eso.org/sci/facilities/paranal/instruments/muse/overview.html).
+#     The 50 x 50 spaxel (10" x 10") grid below is a *crop* of that real
+#     field, not the true FOV -- see UNVERIFIED.
+#   * Nominal wavelength range 480-930 nm; spectral sampling 1.25 A/pixel
+#     (Bacon et al. 2010 MUSE instrument paper; multiple MUSE papers quote
+#     the same 1.25 A/pixel, e.g. arXiv:1812.07345, arXiv:2301.02559).
+#   * Resolving power: ESO quotes WFM R=1770 at 480 nm to R=3590 at 930 nm,
+#     "mean resolution of 3000" across the optical domain -- used directly
+#     below as a single representative value, not interpolated.
+#   * Throughput: ESO's own quoted WFM figures, used as-is with no
+#     interpolation: 14% at 480 nm, 35% at 750 nm, 14% at 930 nm (ESO MUSE
+#     overview page, "MUSE in a nutshell"). A 2018 post-recoating study
+#     (A&A, UT4 recoated Aug 2017) suggests the true current peak may be
+#     closer to 40% near 700 nm -- the more conservative pre-recoating ESO
+#     nutshell figures are used here; revisit if a recoating-era table is
+#     sourced.
+#   * Telescope: UT4 (Yepun), 8.2 m primary; a ~0.94 m secondary gives an
+#     area obstruction of about 1.3% (computed here from reported secondary
+#     diameters, which vary 0.94-1.1 m across sources depending on era --
+#     see commit history/this header for the calculation; no single ESO
+#     obstruction-fraction figure was found).
+#   * seeing_fwhm: 0.74" is the real Paranal DIMM median seeing, 2014-2018
+#     (Butterley, T., Wilson, R. W., Sarazin, M., Dubbeldam, C. M., Osborn,
+#     J., \& Clark, P. 2020, MNRAS, 492, 934, arXiv:1912.04751) -- a site
+#     statistic, not a MUSE-specific on-sky measurement. Sweep it, don't
+#     trust it, same caveat as every other config's fiducial seeing.
+#
+# UNVERIFIED / PLACEHOLDER -- replace before quoting any forecast:
+#   * Field of view: the real WFM field (59.9" x 60.0") is far larger than
+#     any other config in this repo and would make PSF convolution slow for
+#     no benefit on a single background-galaxy KL target; nx/ny below crop
+#     it to a 10" x 10" sub-grid centred on the target. Override nx/ny
+#     directly (up to 300 x 300 at this pixel_scale) to use the real field.
+#   * detector.read_noise and detector.dark_current: no MUSE-specific values
+#     were found published (the CCDs run at ~160 K per ESO, so dark current
+#     should be very low, but no number was sourced). The values below are
+#     generic fiducials typical of a cooled, deep-depletion scientific CCD,
+#     NOT MUSE-measured numbers.
+#   * sky_electron_rate is 0 (NO SKY BACKGROUND), same placeholder pattern as
+#     every other config here: flatters every S/N number. MUSE being at the
+#     real sky-model site (Paranal) makes fixing this comparatively easy --
+#     wire up kino.observing.skymodel directly, no site correction needed.
+#   * exposure_time / n_exposures are fiducial (a single ~1 hour block).
+#   * No AO: this is the seeing-limited WFM, not WFM-AO or NFM-AO (no
+#     optical-aberration terms set below). A future NFM-AO config (25 mas
+#     sampling, 7.5" x 7.5" field) is a natural companion to this one.
+#   * wavelength_min/max/n_wave below are a narrow 10 nm window chosen only
+#     so the config runs quickly; override it (as notebook 04/10 do for
+#     SIFS) to bracket the redshifted line of an actual target within the
+#     real 480-930 nm range.
+
+pixel_scale: "0.20 arcsec"
+nx: 50
+ny: 50
+
+wavelength_min: "0.6950 um"
+wavelength_max: "0.7050 um"
+n_wave: 80                      # 100 A / 1.25 A per pixel
+
+lsf:
+  fwhm: "2.333 angstrom"        # 7000 A / R=3000 (quoted mean resolving power)
+
+psf:
+  seeing_fwhm: "0.74 arcsec"
+
+throughput:
+  wavelength: ["0.480 um", "0.750 um", "0.930 um"]
+  transmission: [0.14, 0.35, 0.14]
+
+aperture_diameter: "8.2 m"
+obstruction_fraction: 0.013
+
+detector:
+  read_noise: "3.0 electron"            # PLACEHOLDER, generic fiducial, see header
+  dark_current: "0.0005 electron / s"   # PLACEHOLDER, generic fiducial, see header
+
+exposure_time: "1200 s"
+n_exposures: 3                  # fiducial 1 hour total
+
+sky_electron_rate: "0 electron / s"   # PLACEHOLDER -- NO SKY, see header

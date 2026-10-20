@@ -27,6 +27,7 @@ data = ["kinms"]
 sky = ["skycalc-cli"]  # only to build the offline sky library (scripts/build_skycalc_library.py)
 dev = ["kino[data]", "ruff", "mypy", "pytest", "pytest-cov", "pre-commit"]
 notebooks = ["jupyterlab", "ipykernel"]
+docs = ["mkdocs", "mkdocs-material", "mkdocstrings[python]"]
 
 [project.urls]
 Homepage = "https://github.com/andrevitorelli/KINO"

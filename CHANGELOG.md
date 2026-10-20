@@ -10,6 +10,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
 
 ### Added
 
+- **`CITATION.cff`**, ahead of the public release (version/DOI fields are
+  explicit placeholders, updated when `v0.1.0` is actually tagged).
+- **`examples/simulate_one_galaxy.py` and `examples/run_inference.py`**
+  implemented as real, thin CLI wrappers (previously `NotImplementedError`
+  stubs tied to phases that are now done). `simulate_one_galaxy.py` builds
+  a `DiscGalaxy`, shears it, observes it through either backend
+  (`--kind ifu|slit`), and writes a minimal FITS round-trip format (a
+  `FLUX`/`SPECTRUM` + `VARIANCE` extension, plus `IMAGE` for the slit case).
+  `run_inference.py` reads that back and runs real nested sampling
+  (`fit_shear`) on `(g1, g2)` with every other `DiscGalaxy` field held fixed
+  at the simulated truth. Both were smoke-tested end to end against real
+  configs (`sifs.yaml`, `goodman.yaml`) -- which caught a real bug before
+  it shipped: `run_inference.py`'s first draft omitted `inc`/`v_flat` from
+  `fixed_galaxy_params`, since neither is a free parameter this CLI exposes,
+  so `DiscGalaxy()` construction failed inside every likelihood call.
+  Nested sampling here is genuinely slow (~0.4s per likelihood evaluation,
+  thousands of evaluations even at modest `n_live`/`n_eff`) -- documented
+  explicitly in both the script and `docs/manual/inference.md` rather than
+  promised away.
+
+### Fixed
+
+- **`kino/analysis/model_compare.py`**'s module docstring said it was
+  blocked on `kino.inference` and the regular-disc model -- both are done
+  now. The real remaining blocker is narrower: a tidally-disturbed/
+  interacting disc model (`kino.galaxy`) doesn't exist yet, and nothing in
+  this module can be implemented without it. Docstring corrected to say so;
+  `compare_models` itself still raises `NotImplementedError`, a deliberate
+  scope choice for `v0.1.0`, not an oversight (it's the one remaining 0%
+  test-coverage file in the whole package).
+
+- **Documentation site**: `mkdocs` + `mkdocs-material` + `mkdocstrings`
+  (not Sphinx -- reads the existing numpydoc-style docstrings directly via
+  `griffe`). `docs/index.md`, `docs/install.md`, `docs/quickstart.md` (a
+  real, tested snippet replacing README's stale "planned API" one),
+  `docs/manual/` (forecasting a target, adding an instrument config,
+  running inference, conventions), `docs/api/` (one page per subpackage).
+  `.github/workflows/docs.yml` builds with `mkdocs build --strict` on
+  every push/PR and deploys to GitHub Pages from `main`.
+- **Fixed**: `forecast_ifu`/`forecast_slit` (`kino/analysis/forecast.py`)
+  built their docstrings by assigning `.__doc__` as an f-string *after*
+  the `def`, which `mkdocstrings` -- or any static doc tool reading the
+  AST -- never sees, so both rendered with no Parameters section at all.
+  Found while standing up the docs site; both now carry a normal, in-place
+  docstring (duplicating the shared parameter text between the two rather
+  than building it from the removed `_FORECAST_PARAMS` constant -- no
+  functional change, confirmed by `pytest tests/analysis/test_forecast*.py`).
+- **`apply_shear`** (`kino/lensing/scene.py`) had a one-line docstring with
+  no Parameters/Returns section -- the one real gap found in an otherwise
+  autodoc-ready public API. Expanded.
+
+- **Three new real-telescope IFU configs, ahead of the public release**:
+  `kino/config/keck_kcwi.yaml` (Keck II KCWI, Medium slicer, BM grating),
+  `kino/config/gemini_gmos_ifu.yaml` (Gemini South GMOS, two-slit mode, R831
+  grating), `kino/config/vlt_muse.yaml` (VLT UT4 MUSE, Wide Field Mode,
+  cropped to a 10"x10" sub-grid of the real 60"x60" field for rendering
+  speed). Same convention as `sifs.yaml`/`goodman.yaml`: every sourced
+  number cites its origin in the file's own header, every unsourced one is
+  an explicitly labelled `PLACEHOLDER`/fiducial (never silently assumed) --
+  MUSE's throughput curve is a rare case where all three header numbers are
+  real, unmodified ESO-quoted values (14%/35%/14% at 480/750/930 nm).
+  MUSE is also the first config at kino.observing.skymodel's own native
+  site (Paranal), so it needs no Pachon/Paranal cross-site correction.
+  Each gets a pinning test (`tests/instruments/test_<name>_config.py`,
+  mirroring `test_goodman_config.py`) and a real `IFU.observe()` call to
+  confirm it forecasts a finite, sane cube end to end, not just that the
+  YAML parses.
+
 - **`kino/config/goodman_red.yaml`, `kino/config/sifs_700r.yaml`**: redder-wavelength variants
   of `goodman.yaml`/`sifs.yaml`, needed to reach Halpha above z ~ 0.11-0.13, where neither
   instrument's real measured throughput extends (Goodman's EG 21 curve stops at 685nm; SIFS's

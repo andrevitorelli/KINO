@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use KINO, please cite it as below."
+title: "KINO: KInematic lensing iNference and mock-Observations"
+abstract: >-
+  A Python toolkit to simulate and test the inference of kinematic lensing
+  (KL) -- the measurement of weak gravitational shear from the distorted
+  velocity field of an individual disc galaxy -- across both integral-field
+  unit (IFU) and slit/grism spectrograph observing modes.
+authors:
+  - family-names: "Zvitorelli"
+    given-names: "Andre"
+    email: "andrezvitorelli@gmail.com"
+repository-code: "https://github.com/andrevitorelli/KINO"
+license: MIT
+# version/date-released/doi/identifiers below are placeholders -- update them
+# (and add a `doi:`/`identifiers:` entry for the Zenodo DOI) when v0.1.0 is
+# actually tagged and released; see README.md Phase 8.
+version: 0.1.0.dev0
+keywords:
+  - astronomy
+  - weak gravitational lensing
+  - kinematic lensing
+  - galaxy kinematics
+  - integral field spectroscopy

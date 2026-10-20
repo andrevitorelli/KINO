@@ -1,0 +1,89 @@
+# Keck II Cosmic Web Imager (KCWI) -- blue channel, Medium image slicer, BM grating.
+#
+# Like sifs.yaml/goodman.yaml (and unlike the fully-fiducial gmtifs.yaml/
+# gmacs.yaml), the numbers below come from KCWI's own published pages and
+# papers where possible, and are marked with their source. ANYTHING NOT
+# LISTED AS SOURCED IS A PLACEHOLDER -- see "UNVERIFIED" below.
+#
+# Sourced:
+#   * Field of view and slicer: KCWI offers three selectable image slicers.
+#     This config uses the Medium slicer: 0.69" slice width, 16.5" x 20.4"
+#     field of view (https://koa.ipac.caltech.edu/UserGuide/KCWI/modes.html).
+#     The Small slicer (0.35", 8.4" x 20.4") trades field for finer sampling
+#     and may suit a more compact background source; the Large slicer
+#     (1.35"-1.38" -- the two Keck pages disagree on the third decimal,
+#     unresolved here, see specs.html vs. modes.html) trades sampling for a
+#     33" x 20.4" field. Swap pixel_scale/nx/ny together to change slicer.
+#   * Grating BM (Medium slicer): R=4000 (central), dispersion 0.28 A/pixel,
+#     total blue-channel coverage 350-550 nm, ~80-90 nm instantaneous
+#     bandpass (same source as above).
+#   * Detector: e2v 4k x 4k blue CCD, 15 micron pixels
+#     (https://www2.keck.hawaii.edu/inst/kcwi/specs.html).
+#   * Peak end-to-end system efficiency "in excess of 45%" across selectable
+#     gratings/coatings (Morrissey et al. 2018, PASP 130, 014001,
+#     arXiv:1807.10356). The *shape* of the curve below is a fiducial bell
+#     peaking at 0.45 (the paper's own stated floor, used conservatively) --
+#     no per-wavelength efficiency table was found; treat the shape as
+#     illustrative, the peak value as sourced.
+#   * Keck II aperture: 36 hexagonal segments, 10.95 m point-to-point, with
+#     an effective (obstruction-corrected) *circular* collecting area
+#     equivalent to a 9.96 m diameter aperture (Keck visitor-instrument
+#     guide, https://www2.keck.hawaii.edu/observing/interfacvinst/ifvifrm-1.html).
+#     Used directly below with obstruction_fraction=0, the same convention
+#     sifs.yaml uses for its own already-obstruction-corrected aperture.
+#   * seeing_fwhm: 0.71" is the Mauna Kea site median (2004-2008, 124 nights;
+#     Chun, M., Wilson, R., Avila, R., et al. 2009, "Mauna Kea Ground-Layer
+#     Characterization Campaign," MNRAS, 394, 1121) -- a site statistic, NOT
+#     an on-sky KCWI measurement. Sweep it, don't trust it, same caveat as
+#     sifs.yaml's own fiducial seeing.
+#
+# UNVERIFIED / PLACEHOLDER -- replace before quoting any forecast:
+#   * detector.read_noise and detector.dark_current: no KCWI-specific values
+#     were found published. The values below are generic fiducials typical
+#     of a modern, LN2-cooled, low-noise scientific CCD controller (e.g. an
+#     Archon-class controller, which KCWI's red channel uses) -- NOT
+#     KCWI-measured numbers. Replace with real values if/when published.
+#   * sky_electron_rate is 0 (NO SKY BACKGROUND), same placeholder pattern as
+#     sifs.yaml: flatters every S/N number. Needs a verified Mauna Kea dark-sky
+#     brightness (V-band or per the target line) converted to e-/s per spaxel.
+#   * exposure_time / n_exposures are fiducial (a single ~1 hour block), not a
+#     real program's requested time.
+#   * Slice geometry is modelled as square 0.69" spaxels; the real along-slice
+#     sampling is finer than the cross-slice slice width in reality (same type
+#     of simplification sifs.yaml makes for its round, crosstalking fibres).
+#   * No AO: KCWI is seeing-limited (no optical-aberration terms set below).
+#
+# The wavelength window below is a narrow 20 nm window (490-510 nm) chosen
+# only so the config runs quickly; override it (as notebook 04/10 do for
+# SIFS) to bracket the redshifted line of an actual target within the BM
+# grating's real 350-550 nm coverage.
+
+pixel_scale: "0.69 arcsec"
+nx: 24
+ny: 30
+
+wavelength_min: "0.4900 um"
+wavelength_max: "0.5100 um"
+n_wave: 714                     # 200 A / 0.28 A per pixel (BM grating dispersion)
+
+lsf:
+  fwhm: "1.25 angstrom"         # 5000 A / R=4000 (BM grating, Medium slicer)
+
+psf:
+  seeing_fwhm: "0.71 arcsec"
+
+throughput:
+  wavelength: ["0.350 um", "0.400 um", "0.450 um", "0.500 um", "0.550 um", "0.560 um"]
+  transmission: [0.15, 0.35, 0.45, 0.45, 0.35, 0.15]
+
+aperture_diameter: "9.96 m"
+obstruction_fraction: 0.0       # effective area-equivalent diameter already used above
+
+detector:
+  read_noise: "2.5 electron"        # PLACEHOLDER, generic fiducial, see header
+  dark_current: "0.0008 electron / s"   # PLACEHOLDER, generic fiducial, see header
+
+exposure_time: "1200 s"
+n_exposures: 3                  # fiducial 1 hour total
+
+sky_electron_rate: "0 electron / s"   # PLACEHOLDER -- NO SKY, see header

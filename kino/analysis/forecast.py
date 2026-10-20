@@ -240,46 +240,6 @@ def narrowed_slit(slit, observed_wavelength: u.Quantity, window_kms: float):
     return _narrowed(slit, observed_wavelength, window_kms)
 
 
-_FORECAST_PARAMS = """
-    target : ForecastTarget
-    night : Night
-        From :func:`kino.observing.night_window`.
-    library : SkyLibrary
-    g : tuple[float, float]
-        The shear you expect (fiducial for the derivatives and the S/N).
-    seeing_ref : Quantity (arcsec), array
-        Seeing values *as site seeing is quoted*: FWHM at 500 nm at zenith.
-    solar_flux : float
-        Monthly-mean 10.7 cm flux, s.f.u. (see :mod:`kino.observing.solar`).
-    max_airmass : float
-        Times with a higher airmass are skipped (the moonlight grid stops at 2).
-    time_step : Quantity (time)
-        Spacing of the sampled times within the night.
-    window_kms : float
-        Half-width of the spectral window around the line, km/s.
-    include_extinction : bool
-        Dim the line flux by the CTIO extinction at each airmass.
-    priors : dict, optional
-        Nuisance-parameter priors for the Fisher estimate
-        (:data:`kino.analysis.fisher.DEFAULT_CUBE_PRIORS`).
-    estimator : {"cube", "moments"}
-        Fisher estimator (see :func:`kino.analysis.fisher.shear_fisher`); the cube
-        one is the default: unbiased and using the flux image as well as the
-        kinematics (``"moments"`` is IFU only).
-    intrinsic_sigma : float, optional
-        A per-galaxy shear floor from what the model does not capture -- non-circular
-        motions, disc thickness, warps, everything a perfect-model Cramer-Rao bound
-        ignores -- added in quadrature. Default ``None`` (no floor): the primary
-        forecast is the **idealised, statistical** S/N (``shear_snr_stat``); real-galaxy
-        floor calibration is a future project's problem, not this pipeline's (2026-09-27
-        direction). Pass a value only for an explicit *sensitivity* comparison (the
-        README's published-forecast target is ``sigma_eps`` ~ 0.02-0.04, for reference).
-    psf_error : float, optional
-        Fractional error on the assumed PSF FWHM (truth larger by this fraction); adds
-        the resulting shear bias, in quadrature, to the error and reports it.
-    """
-
-
 def _forecast(
     instrument,
     target: ForecastTarget,
@@ -461,6 +421,50 @@ def forecast_ifu(
     intrinsic_sigma: float | None = None,
     psf_error: float | None = None,
 ) -> TargetForecast:
+    """Shear S/N against seeing through ``night`` for ``target`` with ``ifu``.
+
+    Parameters
+    ----------
+    ifu : IFU
+        The instrument configuration (exposure, throughput, ... are used as
+        given; its PSF seeing and sky rate are overwritten at each point).
+    target : ForecastTarget
+    night : Night
+        From :func:`kino.observing.night_window`.
+    library : SkyLibrary
+    g : tuple[float, float]
+        The shear you expect (fiducial for the derivatives and the S/N).
+    seeing_ref : Quantity (arcsec), array
+        Seeing values *as site seeing is quoted*: FWHM at 500 nm at zenith.
+    solar_flux : float
+        Monthly-mean 10.7 cm flux, s.f.u. (see :mod:`kino.observing.solar`).
+    max_airmass : float
+        Times with a higher airmass are skipped (the moonlight grid stops at 2).
+    time_step : Quantity (time)
+        Spacing of the sampled times within the night.
+    window_kms : float
+        Half-width of the spectral window around the line, km/s.
+    include_extinction : bool
+        Dim the line flux by the CTIO extinction at each airmass.
+    priors : dict, optional
+        Nuisance-parameter priors for the Fisher estimate
+        (:data:`kino.analysis.fisher.DEFAULT_CUBE_PRIORS`).
+    estimator : {"cube", "moments"}
+        Fisher estimator (see :func:`kino.analysis.fisher.shear_fisher`); the cube
+        one is the default: unbiased and using the flux image as well as the
+        kinematics (``"moments"`` is IFU only).
+    intrinsic_sigma : float, optional
+        A per-galaxy shear floor from what the model does not capture -- non-circular
+        motions, disc thickness, warps, everything a perfect-model Cramer-Rao bound
+        ignores -- added in quadrature. Default ``None`` (no floor): the primary
+        forecast is the **idealised, statistical** S/N (``shear_snr_stat``); real-galaxy
+        floor calibration is a future project's problem, not this pipeline's (2026-09-27
+        direction). Pass a value only for an explicit *sensitivity* comparison (the
+        README's published-forecast target is ``sigma_eps`` ~ 0.02-0.04, for reference).
+    psf_error : float, optional
+        Fractional error on the assumed PSF FWHM (truth larger by this fraction); adds
+        the resulting shear bias, in quadrature, to the error and reports it.
+    """
     return _forecast(
         ifu, target, night, library, g=g, seeing_ref=seeing_ref, solar_flux=solar_flux, site=site,
         max_airmass=max_airmass, time_step=time_step, window_kms=window_kms,
@@ -468,16 +472,6 @@ def forecast_ifu(
         estimator=estimator, intrinsic_sigma=intrinsic_sigma, psf_error=psf_error,
         narrow_fn=narrowed_ifu, sky_rate_fn=ifu_sky_electron_rate,
     )  # fmt: skip
-
-
-forecast_ifu.__doc__ = f"""Shear S/N against seeing through ``night`` for ``target`` with ``ifu``.
-
-    Parameters
-    ----------
-    ifu : IFU
-        The instrument configuration (exposure, throughput, ... are used as
-        given; its PSF seeing and sky rate are overwritten at each point).
-    {_FORECAST_PARAMS}"""
 
 
 def forecast_slit(
@@ -500,20 +494,7 @@ def forecast_slit(
     intrinsic_sigma: float | None = None,
     psf_error: float | None = None,
 ) -> TargetForecast:
-    if estimator != "cube":
-        raise ValueError(
-            "forecast_slit only supports estimator='cube' -- no slit moment likelihood"
-        )
-    return _forecast(
-        slit, target, night, library, g=g, seeing_ref=seeing_ref, solar_flux=solar_flux, site=site,
-        max_airmass=max_airmass, time_step=time_step, window_kms=window_kms,
-        include_extinction=include_extinction, snr_threshold=snr_threshold, priors=priors,
-        estimator=estimator, intrinsic_sigma=intrinsic_sigma, psf_error=psf_error,
-        narrow_fn=narrowed_slit, sky_rate_fn=slit_sky_electron_rate,
-    )  # fmt: skip
-
-
-forecast_slit.__doc__ = f"""Shear S/N against seeing through ``night`` for ``target`` with ``slit``.
+    """Shear S/N against seeing through ``night`` for ``target`` with ``slit``.
 
     Slit losses (a source wider than the slit, or a misaligned ``slit_pa``/
     ``slit_offset``) fall out of the same forward render the IFU case uses -- no
@@ -526,4 +507,51 @@ forecast_slit.__doc__ = f"""Shear S/N against seeing through ``night`` for ``tar
     slit : SlitSpectrograph
         The instrument configuration (exposure, throughput, slit geometry, ... are
         used as given; its PSF seeing and sky rate are overwritten at each point).
-    {_FORECAST_PARAMS}"""
+    target : ForecastTarget
+    night : Night
+        From :func:`kino.observing.night_window`.
+    library : SkyLibrary
+    g : tuple[float, float]
+        The shear you expect (fiducial for the derivatives and the S/N).
+    seeing_ref : Quantity (arcsec), array
+        Seeing values *as site seeing is quoted*: FWHM at 500 nm at zenith.
+    solar_flux : float
+        Monthly-mean 10.7 cm flux, s.f.u. (see :mod:`kino.observing.solar`).
+    max_airmass : float
+        Times with a higher airmass are skipped (the moonlight grid stops at 2).
+    time_step : Quantity (time)
+        Spacing of the sampled times within the night.
+    window_kms : float
+        Half-width of the spectral window around the line, km/s.
+    include_extinction : bool
+        Dim the line flux by the CTIO extinction at each airmass.
+    priors : dict, optional
+        Nuisance-parameter priors for the Fisher estimate
+        (:data:`kino.analysis.fisher.DEFAULT_CUBE_PRIORS`).
+    estimator : {"cube", "moments"}
+        Fisher estimator (see :func:`kino.analysis.fisher.shear_fisher`); the cube
+        one is the default: unbiased and using the flux image as well as the
+        kinematics (``"moments"`` is IFU only).
+    intrinsic_sigma : float, optional
+        A per-galaxy shear floor from what the model does not capture -- non-circular
+        motions, disc thickness, warps, everything a perfect-model Cramer-Rao bound
+        ignores -- added in quadrature. Default ``None`` (no floor): the primary
+        forecast is the **idealised, statistical** S/N (``shear_snr_stat``); real-galaxy
+        floor calibration is a future project's problem, not this pipeline's (2026-09-27
+        direction). Pass a value only for an explicit *sensitivity* comparison (the
+        README's published-forecast target is ``sigma_eps`` ~ 0.02-0.04, for reference).
+    psf_error : float, optional
+        Fractional error on the assumed PSF FWHM (truth larger by this fraction); adds
+        the resulting shear bias, in quadrature, to the error and reports it.
+    """
+    if estimator != "cube":
+        raise ValueError(
+            "forecast_slit only supports estimator='cube' -- no slit moment likelihood"
+        )
+    return _forecast(
+        slit, target, night, library, g=g, seeing_ref=seeing_ref, solar_flux=solar_flux, site=site,
+        max_airmass=max_airmass, time_step=time_step, window_kms=window_kms,
+        include_extinction=include_extinction, snr_threshold=snr_threshold, priors=priors,
+        estimator=estimator, intrinsic_sigma=intrinsic_sigma, psf_error=psf_error,
+        narrow_fn=narrowed_slit, sky_rate_fn=slit_sky_electron_rate,
+    )  # fmt: skip

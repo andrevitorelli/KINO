@@ -22,9 +22,11 @@ Sampler: **nautilus only** (the project dropped the dynesty cross-check
 originally proposed here in favour of a single sampler stack — see
 CLAUDE.md's "Language / stack" convention).
 
-Not implemented yet: depends on kino.inference (README.md Phase 5) and at
-least models 1-3 of kino.galaxy (README.md Phase 1), including a
-tidally-disturbed disc model that does not exist yet.
+Not implemented yet. kino.inference (README.md Phase 5) and the regular-disc
+model (models 1-2 above, README.md Phase 1) are both done now -- the actual
+remaining blocker is narrower than this module's original scope suggested:
+a tidally-disturbed/interacting disc model (model 3) does not exist in
+kino.galaxy yet, and nothing here can be implemented without it.
 """
 
 from __future__ import annotations

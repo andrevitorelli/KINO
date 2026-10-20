@@ -316,6 +316,12 @@ summary level.
 - [ ] MANIFEST+GMACS-like forecast: fibre-IFU bundles / multi-slit, R≈2–5k,
       optical; survey-scale multiplex.
 - [ ] Cluster-background proof-of-concept scenario (O(1) bright galaxies).
+- [x] Real-telescope IFU configs beyond SOAR, ahead of the public release:
+      `kino/config/keck_kcwi.yaml` (Keck II KCWI), `kino/config/gemini_gmos_ifu.yaml`
+      (Gemini South GMOS-IFU), `kino/config/vlt_muse.yaml` (VLT MUSE WFM, cropped to
+      a 10″×10″ sub-grid for speed) -- each sourced/placeholder-labelled the same way
+      as `sifs.yaml`/`goodman.yaml`, with a pinning test. **Not done**: AO-fed
+      near-IR configs (Gemini NIFS / Keck OSIRIS), both a stretch goal.
 
 ### Phase 8 — Docs, examples, release
 - [x] Tutorial notebooks in `notebooks/`: (1) simulate one galaxy, (2) run
@@ -324,34 +330,58 @@ summary level.
       (galaxy -> shear -> IFU -> moment maps -> IFUMomentLikelihood ->
       fit_shear), including a SlitSpectrograph forward-model aside. (3)
       forecast still pending Phase 7.
-- [ ] API docs (Sphinx or mkdocs) + published site.
-- [ ] Worked examples for both instrument backends.
+- [x] API docs + published site: `mkdocs` + `mkdocs-material` +
+      `mkdocstrings` (not Sphinx -- reads the existing numpydoc-style
+      docstrings directly, Markdown-native manual pages sit alongside
+      auto-generated API reference in one site). `docs/`: `index.md`,
+      `install.md`, `quickstart.md` (a real, tested snippet, not the stale
+      "planned API" this section used to show), `manual/` (forecasting a
+      target, adding an instrument config, running inference, conventions),
+      `api/` (one page per subpackage). `.github/workflows/docs.yml` builds
+      with `mkdocs build --strict` on every push/PR and deploys to GitHub
+      Pages on `main`. Caught and fixed a real bug in the process:
+      `forecast_ifu`/`forecast_slit` built their docstring by assigning
+      `.__doc__` *after* the `def`, which `mkdocstrings` (like any static
+      doc tool reading the AST) never sees -- both now have normal,
+      in-place docstrings.
+- [x] Worked examples for both instrument backends:
+      `examples/simulate_one_galaxy.py`/`examples/run_inference.py`, real
+      thin CLI wrappers now (`--kind ifu|slit`), smoke-tested end to end
+      against `sifs.yaml` and `goodman.yaml` with real nested-sampling runs
+      -- which caught a real bug (`fixed_galaxy_params` missing `inc`/
+      `v_flat`) before it shipped. Slit likelihood calls run ~8.5x slower
+      than IFU per evaluation (~3.6s vs ~0.4s), so nested sampling there is
+      correspondingly slower -- both documented as genuinely slow, not a
+      quick CLI demo.
 - [ ] Versioned release (`v0.1.0`), Zenodo DOI, citation file.
 
 ---
 
-## 5. Quickstart (planned API)
+## 5. Quickstart
+
+A real, tested snippet now lives at `docs/quickstart.md` (and the published
+docs site) rather than here, so it can't silently go stale the way the
+"planned API" version below did -- every line in it was run against the
+current API before being written down. The shape is the same as always:
 
 ```python
 from kino.galaxy import DiscGalaxy
 from kino.lensing import apply_shear
-from kino.instruments import IFU, SlitSpectrograph
-from kino.inference import fit_shear
+from kino.instruments.ifu import IFU
+from kino.analysis.fisher import shear_fisher
 
-# 1. intrinsic disc
-gal = DiscGalaxy(r_e=0.5, inc=60, pa=35, v_flat=180, z=0.8)
-
-# 2. lens it
-scene = apply_shear(gal, g1=0.03, g2=-0.01)
-
-# 3. observe (swap the backend for the other mode)
-ifu   = IFU.from_config("config/gmtifs.yaml")
-data  = ifu.observe(scene, exp_time=3*3600)
-
-# 4. infer the shear back
-posterior = fit_shear(data, sampler="nautilus")
-print(posterior.summary())   # g1, g2 with credible intervals
+gal   = DiscGalaxy(r_e=0.5, inc=60, pa=35, v_flat=180, z=0.05, sigma0=30.0)  # 1. intrinsic disc
+scene = apply_shear(gal, g1=0.03, g2=-0.01)                                 # 2. lens it
+ifu   = IFU.from_config("kino/config/sifs.yaml")                            # 3. observe it
+cube  = ifu.observe(scene, line_flux=1e-15 * u.erg/u.s/u.cm**2,
+                     line_wavelength=0.65628 * u.um, rng=rng)
+result = shear_fisher(ifu, gal, line_flux=..., line_wavelength=...,         # 4. how well could
+                       g=(0.03, -0.01))                                     #    this be recovered?
 ```
+
+See `docs/quickstart.md` for the full, runnable version (imports, units,
+`rng`), and `docs/manual/inference.md` for replacing step 4 with a full
+`(g1, g2)` posterior from nested sampling rather than the Fisher bound.
 
 ---
 

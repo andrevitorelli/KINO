@@ -441,9 +441,10 @@ ruff check . && ruff format --check .
 pytest -q
 mypy kino            # if/when typing is enabled
 
-# run a mock + inference example (currently NotImplementedError, see below)
-python examples/simulate_one_galaxy.py --config config/gmtifs.yaml
-python examples/run_inference.py       --config config/gmtifs.yaml
+# run a mock + inference example (see examples/README.md for the full CLI)
+python examples/simulate_one_galaxy.py --config kino/config/sifs.yaml \
+    --line-flux 1e-15 --line-wavelength 0.65628 --g1 0.03 --g2 -0.01 --out mock.fits
+python examples/run_inference.py --data mock.fits --config kino/config/sifs.yaml
 
 # notebooks (needs the `notebooks` extra: pip install -e ".[notebooks]")
 jupyter lab notebooks/

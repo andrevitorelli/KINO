@@ -11,6 +11,9 @@ build/
 dist/
 .ipynb_checkpoints/
 
+# mkdocs build output
+/site/
+
 # curated/downloaded test-data cache -- see TEST_DATA.md Section 4
 /data/
 
