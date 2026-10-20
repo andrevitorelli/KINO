@@ -27,3 +27,6 @@ dist/
 # committed, see CLAUDE.md's "candidate target lists are private" rule
 /proposals/
 *.zip
+
+# status reports (LaTeX build products, internal progress notes) -- never committed
+/reports/
