@@ -1,0 +1,95 @@
+# Keck II OSIRIS -- AO-fed near-IR IFU (Tier B / stretch config).
+#
+# Like sifs.yaml/goodman.yaml/keck_kcwi.yaml/gemini_gmos_ifu.yaml/vlt_muse.yaml/
+# gemini_nifs.yaml, numbers below are sourced where published and marked;
+# ANYTHING NOT LISTED AS SOURCED IS A PLACEHOLDER -- see "UNVERIFIED" below.
+# OSIRIS sits behind Keck II's AO system, like NIFS -- see gemini_nifs.yaml's
+# PSF note for how AO is represented within KINO's existing (non-AO-specific)
+# PSF model; the same caveat applies here.
+#
+# Sourced:
+#   * Lenslet scale / field of view: OSIRIS offers four selectable plate
+#     scales (0.020", 0.035", 0.050", 0.100" per lenslet); field of view
+#     depends on scale and filter (Keck OSIRIS instrument page). This config
+#     uses the 0.050" scale with a Kn3 (K-band) filter field of
+#     ~2.4" x 3.2" -- a mid-range compromise between FOV and sampling for a
+#     compact background disc, nx=48/ny=64 reproducing that field exactly.
+#   * Resolving power: R ~ 3800 at the three finer plate scales (0.020",
+#     0.035", 0.050"), R ~ 3000 at the coarsest 0.100" scale (Keck OSIRIS
+#     instrument page) over a 1.0-2.4 um total range (one filter/band in the
+#     beam at a time). R=3800 applies here (0.050" scale used above).
+#   * AO-corrected PSF: computed as the diffraction limit
+#     1.22 * lambda / D at the window's central wavelength (2.2 um) and
+#     Keck's 9.96 m effective aperture (reused from keck_kcwi.yaml) =
+#     0.056" -- OSIRIS is described on its own instrument page as "a
+#     diffraction-limited integral field spectrograph for Keck," and no
+#     specific achieved on-sky FWHM figure was found, so the geometric
+#     diffraction limit is used as a best-case fiducial (cross-checked
+#     against Gemini's independently quoted ~0.06" K-band AO FWHM for the
+#     8.1 m Gemini aperture in gemini_nifs.yaml's header: the two scale
+#     correctly with aperture). Real AO Strehl is below 1, so actual OSIRIS
+#     PSFs are wider and have more extended halo flux than this idealised
+#     core-only figure -- see gemini_nifs.yaml's PSF caveat, which applies
+#     here too, more optimistically.
+#   * detector.dark_current: <0.025 e-/s/pixel is the current Hawaii-2RG
+#     array's published figure (Keck OSIRIS instrument page; the array was
+#     upgraded from the original Hawaii-2 to a Hawaii-2RG in January 2016,
+#     lowering dark current from the older array's figure).
+#   * Telescope: Keck's 9.96 m effective aperture, obstruction_fraction=0.0,
+#     reused directly from keck_kcwi.yaml (same telescope, already sourced
+#     there).
+#
+# UNVERIFIED / PLACEHOLDER -- replace before quoting any forecast:
+#   * detector.read_noise: 10 e- is a generic Hawaii-2RG-class fiducial
+#     (comparable NIR AO IFU detectors with multiple non-destructive reads
+#     typically achieve roughly 5-15 e-), NOT an OSIRIS-measured figure --
+#     no published read-noise number for OSIRIS's current detector was
+#     found this session.
+#   * throughput: the only real OSIRIS efficiency figure found was the
+#     *grating* efficiency alone (78.0 +/- 1.6% at 1.31 um, post-Dec-2012
+#     grating upgrade; an older grating measured 39.5 +/- 0.8% at the same
+#     wavelength) -- not an end-to-end system throughput (it excludes
+#     telescope, AO bench, re-imaging optics and detector QE losses). The
+#     curve below is a generic fiducial (~15% peak end-to-end), typical of
+#     a multi-optic AO-fed NIR spectrograph after those losses, deliberately
+#     below the bare grating number rather than reusing it directly.
+#   * sky_electron_rate: "3 electron / s" reuses the same generic NIR-sky
+#     fiducial as gmtifs.yaml/gemini_nifs.yaml, NOT a Mauna Kea/OSIRIS
+#     measurement -- same caveat about real K-band sky being OH-line-
+#     dominated and far from flat.
+#   * exposure_time / n_exposures are fiducial (a single ~1 hour block),
+#     matching the convention of every other config here.
+#   * wavelength_min/max/n_wave below are a narrow 10 nm window in K band
+#     chosen only so the config runs quickly; override it (as notebook 04/10
+#     do for SIFS) to bracket the redshifted line of an actual target, and
+#     pick the plate scale/filter whose range covers it.
+
+pixel_scale: "0.050 arcsec"
+nx: 48
+ny: 64
+
+wavelength_min: "2.195 um"
+wavelength_max: "2.205 um"
+n_wave: 70
+
+lsf:
+  resolving_power: 3800          # 0.050" plate scale, Keck OSIRIS instrument page
+
+psf:
+  seeing_fwhm: "0.056 arcsec"    # computed diffraction limit at 2.2 um, see header
+
+throughput:
+  wavelength: ["1.00 um", "1.20 um", "1.50 um", "1.80 um", "2.20 um", "2.40 um"]
+  transmission: [0.04, 0.10, 0.14, 0.15, 0.15, 0.09]
+
+aperture_diameter: "9.96 m"
+obstruction_fraction: 0.0
+
+detector:
+  read_noise: "10 electron"          # PLACEHOLDER, generic H2RG fiducial, see header
+  dark_current: "0.025 electron / s"   # Hawaii-2RG spec, see header
+
+exposure_time: "1200 s"
+n_exposures: 3                     # fiducial 1 hour total
+
+sky_electron_rate: "3 electron / s"   # PLACEHOLDER, generic NIR fiducial, see header

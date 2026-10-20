@@ -1,0 +1,99 @@
+# Gemini North NIFS -- AO-fed near-IR IFU (Tier B / stretch config).
+#
+# Like sifs.yaml/goodman.yaml/keck_kcwi.yaml/gemini_gmos_ifu.yaml/vlt_muse.yaml,
+# numbers below are sourced where published and marked; ANYTHING NOT LISTED AS
+# SOURCED IS A PLACEHOLDER -- see "UNVERIFIED" below. NIFS sits behind
+# Gemini North's Altair AO system (Mauna Kea), unlike the seeing-limited
+# optical configs above -- see the PSF note below for how that is represented
+# within KINO's existing (non-AO-specific) PSF model.
+#
+# Sourced:
+#   * Field of view / slicer: 3" x 3" field cut into 29 slices at 0.103"
+#     per slice (cross-slice sampling); along-slice sampling is finer, 0.042"
+#     per pixel (Gemini NIFS instrument page). KINO's IFU model takes one
+#     square pixel_scale, so this config uses the coarser, slice-defining
+#     0.103" in BOTH directions with nx=ny=29, reproducing the real 3"x3"
+#     field and real slice count exactly in one dimension -- the along-slice
+#     sampling is undersampled relative to the real instrument, a documented
+#     simplification (same type of approximation as KCWI's/MUSE's square-
+#     spaxel treatment of a sliced/lenslet field above).
+#   * Resolving power: R ~ 5290 in H/K bands (R ~ 4990 in Z, ~6040 in J;
+#     Gemini NIFS instrument page) over 0.95-2.40 um total range (4 gratings,
+#     one grating/filter combination in the beam at a time -- not all of
+#     0.95-2.40 um simultaneously). The window below sits in K band, where
+#     the H/K R=5290 applies.
+#   * AO-corrected PSF: Gemini's own NIFS/Altair page quotes a full
+#     (natural-guide-star) AO-corrected spatial resolution of ~0.1" FWHM.
+#     KINO's PSF model has no dedicated Strehl-ratio/core+halo AO
+#     representation -- only a single `seeing_fwhm` (Kolmogorov, normally
+#     atmospheric) plus optional Zernike aberration terms (as used by
+#     gmtifs.yaml for the same reason). This config plugs the quoted
+#     AO-corrected FWHM directly into `seeing_fwhm` as an effective singlePSF
+#     width. This is an approximation: a real AO PSF has a near-diffraction-
+#     limited core atop an extended seeing-like halo, not one Kolmogorov-like
+#     profile, so this understates the halo's contribution to flux outside
+#     the core. Treat NIFS/OSIRIS forecasts as optimistic on exactly this
+#     point until KINO gets a dedicated AO PSF model.
+#   * Telescope: Gemini North shares the 8.1 m aperture / 1.6% obstruction
+#     fraction already computed for Gemini South in gemini_gmos_ifu.yaml
+#     (same telescope design, both Gemini twins) -- reused here rather than
+#     re-derived.
+#   * detector.read_noise: 4.7 e- is NIFS's own quoted "faint object" Fowler
+#     readout mode for its Hawaii-2RG (2048x2048, 18 um pixel) array (Gemini
+#     NIFS instrument page's readout-mode table: bright/medium/faint =
+#     15.0/8.1/4.7 e-, gain 2.8 e-/ADU). The faint-object mode is used here
+#     as the one most relevant to faint background-disc targets.
+#
+# UNVERIFIED / PLACEHOLDER -- replace before quoting any forecast:
+#   * detector.dark_current: 0.01 e-/s is NIFS's own published sensitivity-
+#     model *design assumption*, not a direct on-sky/lab measurement; a
+#     separate commissioning-era figure of <=0.1 e-/s (an order of magnitude
+#     higher) was also found and NOT used here. Check Gemini's current NIFS
+#     detector characterisation page before trusting this number.
+#   * throughput: no NIFS-specific end-to-end efficiency figure was obtained
+#     (the Gemini NIFS sensitivity/throughput page returned an access error
+#     during this session). The curve below is a generic fiducial (~10%
+#     peak, broad near-IR bandpass), typical of an AO-fed NIR IFU after
+#     telescope + AO + grating + detector QE losses, NOT a NIFS-measured
+#     curve.
+#   * sky_electron_rate: "3 electron / s" reuses the same generic NIR-sky
+#     fiducial as gmtifs.yaml, NOT a NIFS/Mauna Kea measurement. Real K-band
+#     sky (dominated by OH airglow lines plus thermal background) varies by
+#     orders of magnitude channel-to-channel and is NOT flat -- this is a
+#     broadband placeholder, more so here than for any optical config above.
+#   * exposure_time / n_exposures are fiducial (a single ~1 hour block),
+#     matching the convention of every other config here.
+#   * wavelength_min/max/n_wave below are a narrow 10 nm window in K band
+#     chosen only so the config runs quickly; override it (as notebook 04/10
+#     do for SIFS) to bracket the redshifted line of an actual target, and
+#     pick the grating/filter whose range covers it.
+
+pixel_scale: "0.103 arcsec"
+nx: 29
+ny: 29
+
+wavelength_min: "2.000 um"
+wavelength_max: "2.010 um"
+n_wave: 70
+
+lsf:
+  resolving_power: 5290         # H/K-band grating, Gemini NIFS instrument page
+
+psf:
+  seeing_fwhm: "0.1 arcsec"     # Altair full AO correction, see header note
+
+throughput:
+  wavelength: ["0.95 um", "1.15 um", "1.40 um", "1.65 um", "2.00 um", "2.20 um", "2.40 um"]
+  transmission: [0.03, 0.07, 0.09, 0.10, 0.10, 0.09, 0.05]
+
+aperture_diameter: "8.1 m"
+obstruction_fraction: 0.016
+
+detector:
+  read_noise: "4.7 electron"       # NIFS faint-object Fowler mode, see header
+  dark_current: "0.01 electron / s"  # PLACEHOLDER, NIFS design assumption, see header
+
+exposure_time: "1200 s"
+n_exposures: 3                   # fiducial 1 hour total
+
+sky_electron_rate: "3 electron / s"   # PLACEHOLDER, generic NIR fiducial, see header

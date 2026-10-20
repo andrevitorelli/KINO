@@ -3,8 +3,9 @@
 Every config in `kino/config/` is a plain YAML file loaded with
 `IFU.from_config(path)` or `SlitSpectrograph.from_config(path)`
 (`kino.instruments.config` does the parsing). This page is the recipe used
-to build `keck_kcwi.yaml`, `gemini_gmos_ifu.yaml`, and `vlt_muse.yaml`, and
-it generalizes to any new IFU or slit spectrograph.
+to build `keck_kcwi.yaml`, `gemini_gmos_ifu.yaml`, `vlt_muse.yaml`, and the
+AO-fed `gemini_nifs.yaml`/`keck_osiris.yaml`, and it generalizes to any new
+IFU or slit spectrograph.
 
 ## The fields a config needs
 
@@ -43,7 +44,19 @@ sky_electron_rate: "0 electron / s"  # per spaxel, already-detected rate (not a 
 Every physical quantity is a string `astropy.units.Quantity` can parse.
 `PSF` also accepts optical-aberration keys (`defocus`, `astig1`, `astig2`,
 `coma1`, `coma2`, `trefoil1`, `trefoil2`, `spher`) for an AO-fed instrument
-— none of the configs shipped so far use them, since none are AO-fed yet.
+— none of the configs shipped so far use them (all default to zero,
+unaberrated optics).
+
+**AO-fed instruments (`gemini_nifs.yaml`, `keck_osiris.yaml`) still only set
+`seeing_fwhm`, not the aberration keys.** KINO has no dedicated Strehl-ratio
+or core+halo AO PSF model, so both configs plug the instrument's own
+quoted (NIFS) or computed-diffraction-limit (OSIRIS) AO-corrected FWHM
+directly into `seeing_fwhm` as an effective single-Gaussian-equivalent
+width. This is a documented approximation: a real AO PSF has a
+near-diffraction-limited core atop an extended seeing-like halo, so this
+understates flux lost to the halo and makes AO forecasts optimistic until
+KINO gets a real AO PSF model. Follow the same pattern for any future
+AO-fed config rather than inventing a different convention.
 
 ## The recipe
 

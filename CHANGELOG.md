@@ -78,6 +78,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
   confirm it forecasts a finite, sane cube end to end, not just that the
   YAML parses.
 
+- **Two AO-fed near-IR IFU configs (Tier B / stretch goal, ahead of the public release)**:
+  `kino/config/gemini_nifs.yaml` (Gemini North NIFS, 3"x3" field at the real 29-slice count,
+  R~5290 H/K) and `kino/config/keck_osiris.yaml` (Keck II OSIRIS, 0.050" plate scale, Kn3 K-band
+  field, R~3800). Same sourced/placeholder convention as every config above, with a pinning test
+  each (`tests/instruments/test_gemini_nifs_config.py`, `test_keck_osiris_config.py`). Both needed
+  a design decision KINO hadn't faced yet: it has no dedicated Strehl-ratio/core+halo AO PSF
+  model, only a single `seeing_fwhm` (plus optional, currently-unused Zernike aberration terms).
+  Resolved by plugging the instrument's own quoted (NIFS: Altair's ~0.1" full AO correction) or
+  computed-diffraction-limit (OSIRIS: 1.22*lambda/D at 2.2um/9.96m = 0.056") AO-corrected FWHM
+  directly into `seeing_fwhm` as an effective single-Gaussian-equivalent width -- documented in
+  both configs' headers and in `docs/manual/adding-an-instrument.md` as an approximation that
+  understates halo flux and makes AO forecasts optimistic until a real AO PSF model exists.
+  OSIRIS's throughput curve deliberately does *not* reuse the one real OSIRIS efficiency number
+  found (78.0+/-1.6% grating-only efficiency at 1.31um) as if it were end-to-end system
+  throughput; the config uses a lower, separately-labelled fiducial instead.
+
 - **`kino/config/goodman_red.yaml`, `kino/config/sifs_700r.yaml`**: redder-wavelength variants
   of `goodman.yaml`/`sifs.yaml`, needed to reach Halpha above z ~ 0.11-0.13, where neither
   instrument's real measured throughput extends (Goodman's EG 21 curve stops at 685nm; SIFS's

@@ -320,8 +320,15 @@ summary level.
       `kino/config/keck_kcwi.yaml` (Keck II KCWI), `kino/config/gemini_gmos_ifu.yaml`
       (Gemini South GMOS-IFU), `kino/config/vlt_muse.yaml` (VLT MUSE WFM, cropped to
       a 10″×10″ sub-grid for speed) -- each sourced/placeholder-labelled the same way
-      as `sifs.yaml`/`goodman.yaml`, with a pinning test. **Not done**: AO-fed
-      near-IR configs (Gemini NIFS / Keck OSIRIS), both a stretch goal.
+      as `sifs.yaml`/`goodman.yaml`, with a pinning test.
+- [x] AO-fed near-IR configs (stretch goal, done): `kino/config/gemini_nifs.yaml`
+      (Gemini North NIFS, 3″×3″/29 slices, R≈5290 H/K) and
+      `kino/config/keck_osiris.yaml` (Keck II OSIRIS, 0.050″ plate scale, R≈3800
+      K band) -- same sourced/placeholder convention, each with a pinning test.
+      Both plug their instrument's own quoted/computed AO-corrected FWHM directly
+      into KINO's existing (non-AO-specific) `seeing_fwhm`, a documented
+      approximation: it has no dedicated Strehl-ratio/core+halo AO PSF model, so
+      these forecasts are optimistic about flux in the AO halo until one exists.
 
 ### Phase 8 — Docs, examples, release
 - [x] Tutorial notebooks in `notebooks/`: (1) simulate one galaxy, (2) run

@@ -52,7 +52,8 @@ inspecting the signal itself before adding noise.
 ## Next steps
 
 - Swap `"kino/config/sifs.yaml"` for any other config in `kino/config/` —
-  `keck_kcwi.yaml`, `gemini_gmos_ifu.yaml`, `vlt_muse.yaml`, `goodman.yaml`
+  `keck_kcwi.yaml`, `gemini_gmos_ifu.yaml`, `vlt_muse.yaml`, the AO-fed
+  near-IR `gemini_nifs.yaml`/`keck_osiris.yaml`, `goodman.yaml`
   (a `SlitSpectrograph`, not an `IFU` — see
   [Forecasting a target](manual/forecasting.md)), or your own.
 - [Forecasting a target](manual/forecasting.md) goes from a real line flux
