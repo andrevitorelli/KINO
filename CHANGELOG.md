@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
 
 ### Added
 
+- **README.md Phase 6 ensemble validation, complete**: `scripts/run_phase6_ensemble.py`
+  (results: `notebooks/data/phase6_ensemble.json`) runs all six remaining ensemble bullets
+  (bias vs. S/N/size/inclination/shear amplitude, shape noise, (m, c), null tests, a published-
+  forecast benchmark, IFU vs. slit) via the same fast maximum-likelihood approach
+  `scripts/validate_fisher_mle.py` already validated against nested sampling, since a real
+  ensemble at nested-sampling cost would take far too long. Real, physically sensible findings:
+  scatter shrinks monotonically with S/N and grows with galaxy size at fixed flux; low
+  inclination (20-40 deg) is ~2x worse than 55-85 deg (the `Vlos ~ sin(inc)` lever arm); `m` and
+  `c` consistent with zero at this ensemble size; a clean null test; IFU beats slit by ~6-8x on
+  a matched target; and the literature benchmark (Pranjal R. S. et al. 2022/2023,
+  sigma=0.022-0.041) is only reproduced once KINO's pure statistical scatter is combined in
+  quadrature with a literature intrinsic floor (Gurri, Taylor & Fluke 2021, sigma=0.024) -- the
+  statistical number alone is reported alongside it, not hidden, per this project's own
+  documented understanding that the idealised bound has no such floor. Building this surfaced
+  two real bugs before a long run could be corrupted by them (an `np.polyfit` SVD failure on a
+  component with no true-shear variation; a slit ensemble silently returning zero scatter,
+  traced to `goodman.yaml`'s real measured throughput correctly going to zero past 685 nm --
+  not a bug, a test redshift placed Hα past that edge).
 - **`kino/galaxy/protocol.py`: `GalaxyModel`**, a `typing.Protocol` formalizing the structural
   contract `kino.lensing.scene.LensedScene`/`apply_shear` already relied on implicitly
   (`surface_brightness`/`vlos`/`velocity_dispersion`/`x0`/`y0`) -- confirms the forward model is

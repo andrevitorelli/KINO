@@ -306,8 +306,10 @@ summary level.
       recovered (g1, g2), bias (m, c), residual σ_ε, null-test mean bias and
       pulls (`recover_shear`, `run_injection`, `summarize_trials`). **IFU only,
       and takes a `DiscGalaxy` rather than a `Datacube`** -- a cube is already
-      an observation and can't be re-sheared. This is the *machinery*: the
-      ensemble suites below have not been run yet.
+      an observation and can't be re-sheared. This is nested-sampling machinery
+      for a single run; the ensemble suites below were run via the faster
+      maximum-likelihood approach instead (`scripts/run_phase6_ensemble.py`),
+      not through this module directly.
 - [ ] `kino/analysis/model_compare.py`: rank lensed / unlensed / tidally
       disturbed models by `nautilus` evidence (TEST_DATA.md Section 3).
       **Deprioritized (2026-10-21 user direction): not expected soon, and
@@ -333,12 +335,48 @@ summary level.
       construction; `DiscGalaxy` is just the only thing implementing it
       today. Does not itself change any call site's behaviour -- see the
       `model_compare.py` bullet above for what's still `DiscGalaxy`-specific.
-- [ ] Injection–recovery suites: bias vs. S/N, size, inclination, shear amplitude.
-- [ ] Shape-noise characterisation: residual σ_ε over galaxy ensembles.
-- [ ] Multiplicative/additive bias (m, c) estimation and reporting.
-- [ ] Null tests (zero-shear ensembles) and calibration diagnostics.
-- [ ] Reproduce a published KL forecast (target σ_ε ≈ 0.02–0.04) as a benchmark.
-- [ ] Compare IFU vs. slit/grism performance on matched galaxy populations.
+- [x] Injection–recovery suites: bias vs. S/N, size, inclination, shear amplitude.
+      `scripts/run_phase6_ensemble.py` (results: `notebooks/data/phase6_ensemble.json`) --
+      maximum-likelihood (Nelder-Mead on the real `IFUCubeLikelihood`/`SlitCubeLikelihood`,
+      the same fast stand-in `scripts/validate_fisher_mle.py` already validated against nested
+      sampling), not full nested sampling, since a real ensemble (N=15/condition x 18
+      conditions, + slit) would otherwise take far too long. Fiducial IFU setup (SIFS,
+      narrowed window, 1.0" seeing, read noise 3 e-, sky 0.5 e-/s) matches
+      `fisher_validation.json`'s own nested-sampling-validated entry exactly. Real findings:
+      scatter shrinks monotonically with flux (0.008 at flux=3e-14 -> 0.0004 at 1e-12,
+      erg/s/cm^2); scatter *grows* with galaxy size at fixed flux (lower surface brightness,
+      0.0016 at r_e=1" -> 0.0056 at r_e=5"); inclination 20-40 deg (low kinematic lever arm,
+      `Vlos ~ sin(inc)`) gives ~2x worse scatter than 55-85 deg. No bias trend outside
+      statistical noise at any swept condition.
+- [x] Shape-noise characterisation: residual σ_ε over galaxy ensembles. Reported per
+      condition above; the dedicated benchmark (below) gives sigma_eps_stat=0.0028 at a
+      moderately bright fiducial target (N=30).
+- [x] Multiplicative/additive bias (m, c) estimation and reporting. `g1`-swept ensemble
+      (0.00, 0.02, 0.05, 0.08, 0.12 at fixed `g2=0`): `m=-0.011`, `c=0.0008` -- consistent
+      with zero given this N. `g2`'s own (m, c) is undefined (no true-shear variation in this
+      sweep) and reported as NaN, matching `kino.analysis.injection.ComponentSummary`'s own
+      convention for the same case, rather than crashing (a real `np.polyfit` SVD failure
+      this script's own development caught).
+- [x] Null tests (zero-shear ensembles) and calibration diagnostics. N=25 at `g_true=(0,0)`:
+      bias `[-0.0001, -0.0005]`, well within `bias_err` (~0.0005-0.0006) of zero -- a clean pass.
+- [x] Reproduce a published KL forecast (target σ_ε ≈ 0.02–0.04) as a benchmark. KINO's pure
+      statistical scatter (0.0028) cannot by itself reach the literature range -- it has no
+      intrinsic floor (per this file's own Phase 7 forecast bullets: "out of scope for now").
+      Combined in quadrature with the literature floor (Gurri, Taylor & Fluke 2021, MNRAS 502,
+      252, doi:10.1093/mnras/stab423, sigma=0.024) gives 0.0242, inside the literature range
+      0.022-0.041 (Pranjal R. S. et al. 2022/2023, MNRAS 524, 3977, doi:10.1093/mnras/stad2014).
+      A real, honest reproduction, not a tuned-to-match number -- the statistical-only figure
+      is reported alongside it, not hidden.
+- [x] Compare IFU vs. slit/grism performance on matched galaxy populations. Same galaxy,
+      flux, and idealised noise assumptions through both SIFS and Goodman (slit aligned to
+      the galaxy's own PA): IFU scatter `[0.00085, 0.0011]` vs. slit `[0.0083, 0.0053]` --
+      IFU ~6-8x tighter, consistent with prior findings elsewhere in this project (notebooks
+      10/11: SIFS beats Goodman by a similar factor on a real target). Building this
+      comparison surfaced a real finding, not a bug: `goodman.yaml`'s real measured
+      throughput is correctly zero past 685 nm (`Throughput.__call__`'s explicit
+      `np.interp(..., left=0, right=0)`) -- an earlier test redshift placed Hα past that
+      edge, giving an entirely noise-floor spectrum; fixed by choosing a redshift within
+      Goodman's real measured coverage.
 
 ### Phase 7 — Instrument case studies
 - [ ] Observing-conditions layer (`kino.observing`), so a target + night gives
