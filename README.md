@@ -203,10 +203,39 @@ tests and a runnable example before the next begins.
       `tests/instruments/`.
 
 ### Phase 4 — Mock data generation
-- [ ] `mocks` layer assembling galaxy + shear + instrument into data products.
-- [ ] FITS/HDF5 writers for cubes, spectra, images; metadata & provenance.
-- [ ] Batch generation from a YAML catalogue (galaxy population + shear field).
-- [ ] Reproducibility: seeded RNG; regenerate identical mocks from a config.
+- [x] `mocks` layer assembling galaxy + shear + instrument into data products.
+      `kino.mocks.single.simulate_observation`: `apply_shear` then
+      `instrument.observe()` (either an `IFU` or `SlitSpectrograph`), plus
+      provenance (every `DiscGalaxy` field, `g1`/`g2`, `line_flux`/
+      `line_wavelength`) attached to the result's `Datacube.meta`. Both
+      `examples/simulate_one_galaxy.py`/`run_inference.py` now use this
+      instead of their own ad hoc assembly/header logic.
+- [x] FITS/HDF5 writers for cubes, spectra, images; metadata & provenance.
+      `kino.io.fitsio`/`kino.io.hdf5`: symmetric `write_datacube`/
+      `read_datacube`/`write_slit_observation`/`read_slit_observation` on
+      each backend. `Datacube.meta` (free-form, including the raw
+      `Quantity` values `IFU.observe`/`SlitSpectrograph.observe` already
+      put there) is JSON-encoded into one header card (FITS, astropy's
+      `CONTINUE`-card folding, verified to round-trip exactly) or one
+      attribute (HDF5) via `kino.io._meta`.
+- [x] Batch generation from a YAML catalogue (galaxy population + shear field).
+      `kino.mocks.catalogue.generate_batch`: one instrument, **one global
+      `(g1, g2)`** applied to every galaxy (every existing forecast/
+      notebook already treats shear this way; a spatially-varying field is
+      out of scope), and either an explicit `galaxies:` list or a sampled
+      `population:` (`uniform`/`loguniform`/`lognormal` -- the last in the
+      same `median`/`scatter_dex` convention as
+      `kino.inference.priors.tully_fisher_prior`). Writes one data file per
+      galaxy plus a `manifest.json`. `kino/config/catalogue_example.yaml` is
+      a documented template; `examples/generate_catalogue.py` a CLI wrapper;
+      `docs/manual/batch-mocks.md` the worked-example manual page.
+- [x] Reproducibility: seeded RNG; regenerate identical mocks from a config.
+      One top-level `seed` spawns `n + 1` independent
+      `numpy.random.SeedSequence` children (the same pattern
+      `kino.analysis.injection._trial_seeds` uses) -- re-running
+      `generate_batch` on the same catalogue regenerates byte-identical
+      output files and an identical manifest, pinned by
+      `tests/mocks/test_catalogue.py`.
 
 ### Phase 5 — Inference engine
 - [x] Likelihood for the **IFU** case (fit model cube / moment maps to data).
@@ -254,19 +283,25 @@ summary level.
       wavelength/velocity axis, spaxel scale, variance/mask, redshift, units).
 - [x] `kino/io/kinms.py`: KinMS wrapper -> `Datacube`, for known-truth
       injection tests (Tier A). Position-angle convention pinned by tests.
-- [ ] `kino/io/manga.py`: reader for MaNGIA (TNG50 mock MaNGA) FITS cubes ->
-      `Datacube`. **Unverified against a real file** — written from the
-      documented HDU structure without a fixture to test against (no
-      TNG-project API key available this session); see that module's
-      docstring for exactly which conventions are read from the file vs.
-      assumed, and `notebooks/06_mangia_datacube_demo.ipynb` for a
-      correctness demo against a synthetic stand-in cube instead.
-- [ ] `kino/io/download.py`: `fetch_file()` (generic download + checksum
-      verification, cached under a git-ignored `data/` dir) is implemented
-      and tested against a local HTTP server. `fetch()` (the MaNGIA fixture
-      manifest, `TEST_DATA.md` Section 4) is not yet usable — every entry's
-      URL is a placeholder pending TNG-project API access to browse the
-      catalogue and confirm real subhalo IDs; see that module's docstring.
+- [x] `kino/io/manga.py`: readers for the **real** MaNGIA (Sarmiento et al. 2022) products,
+      confirmed this session against live downloads from the TNG-project portal -- the
+      originally planned "single flux `Datacube`" reader was wrong (no such product exists).
+      MaNGIA ships as two different things: "maps" (`read_mangia_maps` -> `MangiaMaps`, already
+      spatially gridded but as 41 named 2-D property maps -- `VEL`, `DISP`, `MASS`, etc. -- not a
+      spectral cube) and "rss" (`read_mangia_rss` -> `MangiaRSS`, a real flux-calibrated spectrum
+      per fibre plus each fibre's sky position, **not** pre-gridded). `regrid_fibers_to_grid`/
+      `regrid_rss_to_cube` turn an `rss` file into a real `Datacube` via a documented, simplified
+      Gaussian-kernel regridding -- validated (not just unit-tested) by regridding a real galaxy's
+      per-fibre ground-truth `VEL`/`DISP` and comparing against that *same* galaxy's official,
+      pre-gridded `maps` product.
+- [x] `kino/io/download.py`: `fetch_file()` (generic download + checksum verification) unchanged.
+      The MaNGIA-specific layer is now real: there is no per-galaxy download URL (the old
+      `fetch()`/`MANGIA_FIXTURES` design assumed one that doesn't exist) -- `/api/TNG50-1/files/
+      mangia/` lists exactly three bulk `tar.gz` archives (`catalog` ~480 KB, `maps` ~37 GB, `rss`
+      ~345 GB). `stream_tar_member_names`/`stream_extract_tar_members` stream a remote `.tar.gz`
+      and extract only the requested member(s) in one pass, without buffering the archive --
+      `fetch_mangia_member(s)` are the MaNGIA-specific wrappers. Ten real (RSS, maps) galaxy pairs
+      fetched this way into the git-ignored `data/mangia/` cache for development/testing.
 - [x] `kino/analysis/injection.py`: known-shear injection-recovery, reporting
       recovered (g1, g2), bias (m, c), residual σ_ε, null-test mean bias and
       pulls (`recover_shear`, `run_injection`, `summarize_trials`). **IFU only,

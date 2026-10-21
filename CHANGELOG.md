@@ -8,8 +8,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
 
 ## [Unreleased]
 
+### Fixed
+
+- **`kino.io.manga` was wrong, not just unverified against real MaNGIA data** (verified
+  2026-10-21 with a real TNG-project API key). MaNGIA (Sarmiento et al. 2022/2023) does not
+  release a single flux `Datacube`: it ships "maps" (already-gridded, but 41 named 2-D
+  ground-truth property maps -- `VEL`/`DISP`/`MASS`/etc. -- with no spectral axis at all) and
+  "rss" (real flux-calibrated per-fibre spectra, with real fibre sky positions, *not*
+  pre-gridded). `read_mangia_cube`/`DEFAULT_PIXEL_SCALE`/`DEFAULT_FLUX_UNIT` removed entirely
+  and replaced with `read_mangia_maps`/`read_mangia_rss` matching the real structure, plus new
+  `regrid_fibers_to_grid`/`regrid_rss_to_cube` (a documented, simplified Gaussian-kernel
+  regridding -- not a flux-conserving reproduction of the real MaNGA DRP cubing algorithm, Law
+  et al. 2016 -- that builds a genuine `Datacube` from an `rss` file). Validated empirically,
+  not just unit-tested: regridding a real galaxy's per-fibre ground-truth `VEL`/`DISP` and
+  comparing against that *same* galaxy's official, pre-gridded `maps` product agrees to a few
+  percent for most of an 8-galaxy real sample (one informative outlier at ~30-65%, likely a
+  poor match for that galaxy's finer-scale structure -- see `scripts/validate_mangia_regrid.py`
+  and `notebooks/06_mangia_datacube_demo.ipynb`, both rewritten against real downloaded data).
+  `kino.io.download`'s MaNGIA layer was also wrong (its `MANGIA_FIXTURES`/`fetch()` design
+  assumed a per-galaxy download URL that doesn't exist): MaNGIA exposes exactly three bulk
+  `tar.gz` archives (catalog ~480KB, maps ~37GB, rss ~345GB) with no narrower listing. New
+  `stream_tar_member_names`/`stream_extract_tar_member(s)` stream a remote archive and extract
+  only the requested member(s) in one pass without buffering it, with
+  `fetch_mangia_member(s)`/`mangia_archive_url`/`list_mangia_members`/`mangia_member_name` as
+  the MaNGIA-specific wrappers.
+
 ### Added
 
+- **README.md Phase 4 (mock data generation), complete**: `kino.mocks.single.
+  simulate_observation` (galaxy + shear + instrument -> mock data product,
+  with provenance -- every `DiscGalaxy` field, `g1`/`g2`, `line_flux`/
+  `line_wavelength` -- attached to the result's `Datacube.meta`) and
+  `kino.mocks.catalogue.generate_batch` (a YAML catalogue of galaxies,
+  explicit or sampled from a small set of distributions, sharing one
+  instrument and **one global** `(g1, g2)` -- a spatially-varying shear
+  field is explicitly out of scope). New `kino.io.fitsio`/`kino.io.hdf5`:
+  a symmetric FITS/HDF5 `write_datacube`/`read_datacube`/
+  `write_slit_observation`/`read_slit_observation` API, generalizing the
+  ad hoc round-trip that previously lived only inside
+  `examples/simulate_one_galaxy.py`/`run_inference.py`, now with
+  `VARIANCE`/`MASK` extensions and JSON-encoded `meta` provenance
+  (`kino.io._meta`) that neither ad hoc version carried. Reproducibility:
+  one top-level `seed` spawns per-galaxy `numpy.random.SeedSequence`
+  children exactly as `kino.analysis.injection._trial_seeds` already does,
+  so re-running `generate_batch` on the same catalogue regenerates
+  byte-identical files and manifest -- pinned by
+  `tests/mocks/test_catalogue.py`. `kino/config/catalogue_example.yaml`
+  (documented template, explicit-list and population variants),
+  `examples/generate_catalogue.py` (CLI wrapper), and
+  `docs/manual/batch-mocks.md` (worked-example manual page, wired into
+  `mkdocs.yml`'s nav alongside a new `docs/api/mocks.md`). Both example
+  scripts refactored to use the new API instead of their private
+  `_datacube_hdu`/`_datacube_from_hdu` helpers -- `run_inference.py` now
+  reads every fixed galaxy/shear/line parameter back from the mock's own
+  `Datacube.meta` rather than a bespoke FITS header. 19 new tests across
+  `tests/mocks/` and `tests/io/test_fitsio.py`/`test_hdf5.py`.
 - **`CITATION.cff`**, ahead of the public release (version/DOI fields are
   explicit placeholders, updated when `v0.1.0` is actually tagged).
 - **`examples/simulate_one_galaxy.py` and `examples/run_inference.py`**

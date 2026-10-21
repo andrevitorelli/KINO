@@ -69,8 +69,13 @@ these off in `README.md` Phase 6 as they land, and add tests for each.
 - [ ] `kino/io/base.py`: a common in-memory **`Datacube`** container (flux cube,
       wavelength/velocity axis, WCS/spaxel scale, variance/mask, redshift, units)
       that the inference likelihood consumes — regardless of source.
-- [ ] `kino/io/manga.py`: reader for MaNGA/MaNGIA/iMaNGA FITS cubes → `Datacube`
-      (and a helper to pull the DAP stellar/gas velocity + dispersion maps).
+- [x] `kino/io/manga.py`: readers for the real MaNGIA products (confirmed against live
+      downloads, 2026-10-21) -- `read_mangia_maps` is exactly "a helper to pull the
+      stellar/gas velocity + dispersion maps" this bullet names (MaNGIA ships these
+      pre-gridded, not a flux cube); `read_mangia_rss` + `regrid_rss_to_cube` build a real
+      `Datacube` from MaNGIA's un-gridded per-fibre product instead, since no pre-gridded
+      flux cube exists in the real release. iMaNGA is not covered (`icg.port.ac.uk/imanga/`
+      unexplored this session).
 - [ ] `kino/io/kinms.py`: thin wrapper to generate a KinMS cube → `Datacube`, for
       known-truth injection tests.
 - [ ] `kino/io/download.py`: fetch-on-demand for a **curated subset** (Section 4),

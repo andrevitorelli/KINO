@@ -30,14 +30,31 @@ Read it before making changes. Keep it up to date as the project evolves.
 > early -- see below -- ahead of the rest of Phase 6 per `TEST_DATA.md`),
 > and `kino.analysis.moments` (flux/Vlos/dispersion moment maps with
 > delta-method error propagation from any `Datacube`, also ahead of the rest
-> of Phase 6) are implemented and tested. **`kino.io.manga.read_mangia_cube`
-> and `kino.io.download`'s MaNGIA fixture manifest are unverified against
-> real data** -- this session had no IllustrisTNG API key (needed to browse
-> the MaNGIA catalogue; free registration at
-> https://www.tng-project.org/users/register/), so both were written from
-> documented file structure and tested against a synthetic stand-in cube
-> instead (`notebooks/06_mangia_datacube_demo.ipynb`); see both modules'
-> docstrings before trusting them against a real file. `kino.inference`
+> of Phase 6) are implemented and tested. **`kino.io.manga`/`kino.io.download`'s
+> MaNGIA support is now verified against real downloaded files** (2026-10-21,
+> with a real TNG-project API key) -- and the earlier version of both was
+> *wrong*, not just unverified: there is no single flux `Datacube` MaNGIA
+> product. MaNGIA ships as "maps" (already-gridded 2-D property maps --
+> `VEL`/`DISP`/`MASS`/etc., read by `read_mangia_maps`, no spectral axis at
+> all) and "rss" (real per-fibre flux spectra + real fibre sky positions,
+> *not* pre-gridded, read by `read_mangia_rss`); `regrid_fibers_to_grid`/
+> `regrid_rss_to_cube` build a real `Datacube` from an `rss` file via a
+> documented, simplified Gaussian-kernel regridding, validated against the
+> matching `maps` file's own ground-truth `VEL`/`DISP` for the same galaxy
+> (not just unit-tested). `kino.io.download` gained
+> `stream_tar_member_names`/`stream_extract_tar_members`(`_member` for one)
+> and MaNGIA-specific wrappers (`fetch_mangia_member(s)`,
+> `mangia_archive_url`, `list_mangia_members`) once it turned out MaNGIA has
+> no per-galaxy download URL at all -- only three bulk `tar.gz` archives
+> (`catalog` ~480 KB, `maps` ~37 GB, `rss` ~345 GB) -- so these stream a
+> remote archive and extract only the requested member(s), never buffering
+> the whole thing. Ten real (rss, maps) galaxy pairs are cached under the
+> git-ignored `data/mangia/` for development/testing; `notebooks/
+> 06_mangia_datacube_demo.ipynb` still shows the old, now-superseded
+> synthetic-stand-in approach and needs rewriting against the real reader
+> (not done this session). iMaNGA (the *other* TNG50 mock-MaNGA catalogue,
+> a different team's product despite the similar name) is untouched.
+> `kino.inference`
 > (Phase 5: `IFUMomentLikelihood` -- a moment-map Gaussian likelihood that
 > forward-models each trial through the *same* `IFU` pipeline as the data
 > so PSF-driven beam smearing cancels rather than biasing the fit;
@@ -49,9 +66,25 @@ Read it before making changes. Keep it up to date as the project evolves.
 > `kino.analysis.injection` (Phase 6: `recover_shear`/`run_injection`/
 > `summarize_trials` -- ensemble injection-recovery giving (m, c), residual
 > sigma_eps, null-test bias and pulls) exists and is unit-tested, but no
-> science-scale ensemble has been run yet. Phase 4
-> (`kino.mocks`) has not started, so `examples/` and the rest of
-> `kino/analysis/` are still placeholders that raise `NotImplementedError`.
+> science-scale ensemble has been run yet. Phase 4 (`kino.mocks`) is done:
+> `kino.mocks.single.simulate_observation` (galaxy -> shear ->
+> `IFU`/`SlitSpectrograph`, with provenance -- every `DiscGalaxy` field,
+> `g1`/`g2`, `line_flux`/`line_wavelength` -- attached to the result's
+> `Datacube.meta`) and `kino.mocks.catalogue.generate_batch` (a YAML
+> catalogue of galaxies, explicit or sampled from a small, documented set
+> of distributions, sharing one instrument and **one global** `(g1, g2)`
+> -- a spatially-varying shear field is out of scope; reproducible via the
+> same `SeedSequence`-spawning pattern as `kino.analysis.injection`).
+> `kino.io.fitsio`/`kino.io.hdf5` give both a symmetric FITS/HDF5
+> read/write API for `Datacube`/`SlitObservation`, with free-form `meta`
+> (including the raw `Quantity` values already in it) JSON-encoded via
+> `kino.io._meta`. `examples/simulate_one_galaxy.py`/`run_inference.py` now
+> use this real API instead of their own ad hoc assembly/FITS-header
+> logic; `examples/generate_catalogue.py` and
+> `kino/config/catalogue_example.yaml` are new. The rest of
+> `kino/analysis/` (`model_compare.py`) is still a placeholder that raises
+> `NotImplementedError` -- unrelated to Phase 4, blocked on a
+> tidally-disturbed disc model that doesn't exist in `kino.galaxy` yet.
 > `notebooks/04_one_galaxy_inference.ipynb` has been rewritten against the
 > real Phase 1-3/5 API (galaxy -> shear -> `IFU.observe` -> moment maps ->
 > `IFUMomentLikelihood`/`fit_shear`) and executes end to end, recovering an
@@ -399,14 +432,60 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   redward of ~685-730nm (needed for Halpha above z ~ 0.11-0.13), so each extends its own real
   curve with a flat, explicitly fiducial continuation, kept in a *separate* config file so the
   real, measured, test-pinned originals are untouched.
+- **Mocks and mock I/O (`kino.mocks`, `kino.io.fitsio`, `kino.io.hdf5`):**
+  `kino.mocks.single.simulate_observation(galaxy, g1, g2, instrument, ...)`
+  is `apply_shear` then `instrument.observe()` -- its only value-add over
+  calling those two directly is writing **provenance** into the result's
+  `Datacube.meta` (every `DiscGalaxy` field via `dataclasses.asdict`, plus
+  `g1`/`g2`/`line_flux`/`line_wavelength`); for a `SlitObservation` result
+  this goes on `result.spectrum.meta`, the only `Datacube` it carries.
+  `kino.mocks.catalogue.generate_batch` reads a YAML catalogue (one
+  instrument, **one global `(g1, g2)` applied to every galaxy** -- every
+  existing forecast/notebook already treats shear this way; a
+  spatially-varying shear field is explicitly out of scope) and either an
+  explicit `galaxies:` list or a `population:` sampled from a small, fixed
+  set of distributions (`uniform`, `loguniform`, `lognormal` with
+  `median`/`scatter_dex` -- the same `log10`-scatter convention as
+  `tully_fisher_prior`). A catalogue row may set any
+  `dataclasses.fields(DiscGalaxy)` name plus `line_flux`/`line_wavelength`
+  (parsed via `kino.instruments.config.parse_quantity`, so both take the
+  same `"<value> <unit>"` string form every instrument config already
+  uses); an unknown key raises `ValueError` naming the allowed set.
+  `kino.mocks` deliberately does **not** import `kino.inference` to get
+  this field list (that dependency direction doesn't otherwise exist in
+  the codebase) -- `tests/mocks/test_catalogue.py` pins that its
+  independently-built set still matches
+  `kino.inference.likelihood.GALAXY_FIELDS`. Reproducibility: one
+  top-level `seed` spawns `n + 1` `numpy.random.SeedSequence` children
+  (child 0 for the population sampler, one per galaxy for its noise) --
+  the exact pattern `kino.analysis.injection._trial_seeds` uses -- so
+  re-running `generate_batch` on the same catalogue regenerates
+  byte-identical files and an identical `manifest.json`.
+  `kino.io.fitsio`/`kino.io.hdf5` give a symmetric `write_datacube`/
+  `read_datacube`/`write_slit_observation`/`read_slit_observation` API on
+  each backend; `Datacube.meta` is free-form and already holds raw
+  `astropy.units.Quantity` values (`IFU.observe`/`SlitSpectrograph.observe`
+  put `line_wavelength_rest`/`line_flux_intrinsic`/etc. there themselves),
+  so both back ends JSON-encode it through `kino.io._meta.dumps_meta`
+  (anything not natively JSON-serializable is stringified) rather than
+  assuming plain scalars -- reading it back is a **text** round-trip
+  (`"0.65628 um"`), not a type-preserving one. FITS stores this in one
+  `METAJSON` header card; astropy's `fits.Header` auto-folds a long string
+  across `CONTINUE` cards, so no manual chunking is needed (verified for a
+  representative galaxy-provenance blob). `examples/simulate_one_galaxy.py`/
+  `run_inference.py` use this real API end to end now, including reading
+  every fixed galaxy/shear/line parameter back from `Datacube.meta` rather
+  than a bespoke FITS header.
 - **External-data readers (`kino.io.manga`, `kino.io.download`):** convert
   to KINO's conventions in the reader, not downstream (`TEST_DATA.md`
   Section 5) — but check each reader's own module docstring for which
   conventions that reader has actually confirmed against a real file vs.
-  assumed from documentation. `read_mangia_cube` is currently the latter
-  (unverified; see the status banner above) — treat its wavelength-axis,
-  pixel-scale, flux-unit, and mask-polarity defaults as starting points to
-  check, not facts, until tested against a real MaNGIA cube.
+  assumed from documentation. `kino.io.manga` is now verified against real
+  MaNGIA files (see the status banner above) for the structural facts
+  (extension names, `TYPE<i>` map keys, wavelength grid, fibre positions);
+  the fibre East-of-North orientation and the exact flux-unit
+  normalisation (`/Angstrom` implicit, not spelled out in the file's own
+  header) remain unconfirmed assumptions — check before trusting either.
 
 ## Repository layout (target)
 

@@ -1,21 +1,33 @@
 """Tests for kino.io.download.
 
-fetch_file() is generic (no MaNGIA/TNG-specific knowledge) and is tested
-here against a local HTTP server -- no network access or credentials
-needed. fetch() itself (the MaNGIA-fixture layer) can't be exercised beyond
-its NotImplementedError path: this session had no TNG-project API key to
-confirm real download URLs (see kino/io/download.py's module docstring).
+fetch_file() and the generic streaming-tar functions (stream_tar_member_names,
+stream_extract_tar_member(s)) have no MaNGIA/TNG-specific knowledge and are
+tested here against a local HTTP server serving a small test .tar.gz -- no
+network access or credentials needed. The MaNGIA-specific wrappers
+(fetch_mangia_member(s), list_mangia_members) are thin enough (URL + header
+construction around the already-tested generic functions) that they aren't
+separately covered here; mangia_archive_url/mangia_member_name (pure string
+construction) are.
 """
 
 from __future__ import annotations
 
 import hashlib
 import http.server
+import io
+import tarfile
 import threading
 
 import pytest
 
-from kino.io.download import MANGIA_FIXTURES, fetch, fetch_file
+from kino.io.download import (
+    fetch_file,
+    mangia_archive_url,
+    mangia_member_name,
+    stream_extract_tar_member,
+    stream_extract_tar_members,
+    stream_tar_member_names,
+)
 
 
 @pytest.fixture
@@ -39,6 +51,14 @@ def http_server(tmp_path):
 def _url(server, name: str) -> str:
     host, port = server.server_address[:2]
     return f"http://{host}:{port}/{name}"
+
+
+def _write_test_tarball(path, contents: dict[str, bytes]) -> None:
+    with tarfile.open(path, "w:gz") as tf:
+        for name, data in contents.items():
+            info = tarfile.TarInfo(name=name)
+            info.size = len(data)
+            tf.addfile(info, io.BytesIO(data))
 
 
 class TestFetchFile:
@@ -111,14 +131,97 @@ class TestFetchFile:
         assert result.read_bytes() == new_content
 
 
-class TestFetchMangiaFixture:
-    def test_unknown_fixture_name_raises(self, tmp_path):
-        with pytest.raises(ValueError):
-            fetch("not_a_real_fixture", cache_dir=tmp_path)
+class TestStreamTarMemberNames:
+    def test_lists_members(self, http_server, tmp_path):
+        server, served_dir = http_server
+        _write_test_tarball(served_dir / "archive.tar.gz", {"a.txt": b"1", "b.txt": b"2"})
+        names = list(stream_tar_member_names(_url(server, "archive.tar.gz")))
+        assert names == ["a.txt", "b.txt"]
 
-    @pytest.mark.parametrize("name", sorted(MANGIA_FIXTURES))
-    def test_unpopulated_fixtures_raise_not_implemented(self, name, tmp_path):
-        # every fixture manifest entry has url=None until someone with TNG
-        # API access fills it in -- see kino/io/download.py's module docstring.
-        with pytest.raises(NotImplementedError):
-            fetch(name, cache_dir=tmp_path)
+    def test_respects_limit(self, http_server, tmp_path):
+        server, served_dir = http_server
+        _write_test_tarball(
+            served_dir / "archive.tar.gz", {"a.txt": b"1", "b.txt": b"2", "c.txt": b"3"}
+        )
+        names = list(stream_tar_member_names(_url(server, "archive.tar.gz"), limit=2))
+        assert names == ["a.txt", "b.txt"]
+
+
+class TestStreamExtractTarMembers:
+    def test_extracts_requested_members_only(self, http_server, tmp_path):
+        server, served_dir = http_server
+        _write_test_tarball(
+            served_dir / "archive.tar.gz",
+            {"a.txt": b"content-a", "b.txt": b"content-b", "c.txt": b"content-c"},
+        )
+        targets = {"a.txt": tmp_path / "a_out.txt", "c.txt": tmp_path / "c_out.txt"}
+        found = stream_extract_tar_members(_url(server, "archive.tar.gz"), targets)
+        assert set(found) == {"a.txt", "c.txt"}
+        assert targets["a.txt"].read_bytes() == b"content-a"
+        assert targets["c.txt"].read_bytes() == b"content-c"
+        assert not (tmp_path / "b_out.txt").exists()
+
+    def test_missing_member_is_absent_from_result_not_an_error(self, http_server, tmp_path):
+        server, served_dir = http_server
+        _write_test_tarball(served_dir / "archive.tar.gz", {"a.txt": b"content-a"})
+        targets = {"a.txt": tmp_path / "a_out.txt", "nope.txt": tmp_path / "nope_out.txt"}
+        found = stream_extract_tar_members(_url(server, "archive.tar.gz"), targets)
+        assert set(found) == {"a.txt"}
+
+    def test_skips_already_cached_dest_unless_overwrite(self, http_server, tmp_path):
+        server, served_dir = http_server
+        _write_test_tarball(served_dir / "archive.tar.gz", {"a.txt": b"fresh-content"})
+        dest = tmp_path / "a_out.txt"
+        dest.write_bytes(b"stale")
+
+        found = stream_extract_tar_members(_url(server, "archive.tar.gz"), {"a.txt": dest})
+        assert found["a.txt"].read_bytes() == b"stale"
+
+        found = stream_extract_tar_members(
+            _url(server, "archive.tar.gz"), {"a.txt": dest}, overwrite=True
+        )
+        assert found["a.txt"].read_bytes() == b"fresh-content"
+
+
+class TestStreamExtractTarMember:
+    def test_extracts_one_member(self, http_server, tmp_path):
+        server, served_dir = http_server
+        _write_test_tarball(served_dir / "archive.tar.gz", {"a.txt": b"content-a"})
+        dest = tmp_path / "out.txt"
+        result = stream_extract_tar_member(_url(server, "archive.tar.gz"), "a.txt", dest)
+        assert result == dest
+        assert dest.read_bytes() == b"content-a"
+
+    def test_raises_keyerror_if_not_found(self, http_server, tmp_path):
+        server, served_dir = http_server
+        _write_test_tarball(served_dir / "archive.tar.gz", {"a.txt": b"content-a"})
+        with pytest.raises(KeyError):
+            dest = tmp_path / "out.txt"
+            stream_extract_tar_member(_url(server, "archive.tar.gz"), "nope.txt", dest)
+
+
+class TestMangiaUrlHelpers:
+    def test_mangia_archive_url_builds_expected_url(self):
+        assert mangia_archive_url("maps") == (
+            "https://www.tng-project.org/api/TNG50-1/files/mangia_maps.tar.gz"
+        )
+
+    def test_mangia_archive_url_rejects_unknown_which(self):
+        with pytest.raises(ValueError):
+            mangia_archive_url("not_a_real_archive")
+
+    def test_mangia_member_name_maps(self):
+        assert (
+            mangia_member_name(97, 664052, 0, 127, which="maps")
+            == "maps/TNG50-97-664052-0-127.cube_maps.fits"
+        )
+
+    def test_mangia_member_name_rss(self):
+        assert (
+            mangia_member_name(97, 664052, 0, 127, which="rss")
+            == "RSS/TNG50-97-664052-0-127.cube_RSS.fits"
+        )
+
+    def test_mangia_member_name_rejects_unknown_which(self):
+        with pytest.raises(ValueError):
+            mangia_member_name(97, 664052, 0, 127, which="not_a_real_kind")
