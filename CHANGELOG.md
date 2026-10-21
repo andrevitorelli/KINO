@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
 
 ## [Unreleased]
 
+### Added
+
+- **`kino/galaxy/protocol.py`: `GalaxyModel`**, a `typing.Protocol` formalizing the structural
+  contract `kino.lensing.scene.LensedScene`/`apply_shear` already relied on implicitly
+  (`surface_brightness`/`vlos`/`velocity_dispersion`/`x0`/`y0`) -- confirms the forward model is
+  already model-agnostic; `DiscGalaxy` is just the only implementation today. Generalizing the
+  inference/mocks layers (`kino.inference.likelihood`, `kino.mocks.catalogue`,
+  `kino.analysis.injection`) to accept any conforming model instead of hardcoding `DiscGalaxy`
+  is real, deliberately deferred future work (2026-10-21 user direction: not expected soon, not
+  blocking the companion paper) -- see README.md's Phase 6 `model_compare.py` bullet.
+
 ### Fixed
 
 - **`kino.io.manga` was wrong, not just unverified against real MaNGIA data** (verified

@@ -310,7 +310,29 @@ summary level.
       ensemble suites below have not been run yet.
 - [ ] `kino/analysis/model_compare.py`: rank lensed / unlensed / tidally
       disturbed models by `nautilus` evidence (TEST_DATA.md Section 3).
-      Blocked on Phases 1, 5.
+      **Deprioritized (2026-10-21 user direction): not expected soon, and
+      not blocking the companion paper.** KINO's own job is to be the
+      general forward model and inference engine, not to ship every
+      possible disc model itself -- users should be able to bring their
+      own (tidally-disturbed, warped, barred, ...) model as a drop-in,
+      not a fork of `DiscGalaxy`. What *is* needed for that, and is also
+      not done yet: generalizing `kino.inference.likelihood`
+      (`GALAXY_FIELDS`, `_scene_from_params`'s hardcoded
+      `DiscGalaxy(**galaxy_kwargs)`), `kino.mocks.catalogue`, and
+      `kino.analysis.injection` to accept any model class satisfying
+      `kino.galaxy.GalaxyModel` (new, see below) instead of importing
+      `DiscGalaxy` directly -- mechanical once undertaken (a `@dataclass`
+      model already gives its own field list for free via
+      `dataclasses.fields()`), not started.
+- [x] `kino/galaxy/protocol.py`: `GalaxyModel`, a `typing.Protocol`
+      (`@runtime_checkable`) formalizing the structural contract
+      `kino.lensing.scene.LensedScene`/`apply_shear` already rely on
+      implicitly (`surface_brightness(x, y)`, `vlos(x, y)`,
+      `velocity_dispersion(x, y)`, `x0`/`y0`) -- confirms the forward
+      model (galaxy -> shear -> instrument) is already model-agnostic by
+      construction; `DiscGalaxy` is just the only thing implementing it
+      today. Does not itself change any call site's behaviour -- see the
+      `model_compare.py` bullet above for what's still `DiscGalaxy`-specific.
 - [ ] Injection–recovery suites: bias vs. S/N, size, inclination, shear amplitude.
 - [ ] Shape-noise characterisation: residual σ_ε over galaxy ensembles.
 - [ ] Multiplicative/additive bias (m, c) estimation and reporting.
