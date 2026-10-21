@@ -5,9 +5,13 @@ and reproducible per `CLAUDE.md`.
 
 - `simulate_one_galaxy.py` — intrinsic disc + shear -> instrument backend ->
   mock data (image, IFU datacube, or slit/grism spectrum, depending on the
-  instrument config).
+  instrument config), via `kino.mocks.single.simulate_observation` +
+  `kino.io.fitsio`.
 - `run_inference.py` — mock data + instrument config -> `kino.inference`
   (`nautilus` sampler) -> (g1, g2) posterior.
+- `generate_catalogue.py` — a YAML catalogue of galaxies (explicit list or
+  a sampled population) + one global shear -> a batch of mock files + a
+  `manifest.json`, via `kino.mocks.catalogue.generate_batch`.
 
 ```bash
 python examples/simulate_one_galaxy.py --config kino/config/sifs.yaml \
@@ -15,6 +19,9 @@ python examples/simulate_one_galaxy.py --config kino/config/sifs.yaml \
     --out mock.fits
 
 python examples/run_inference.py --data mock.fits --config kino/config/sifs.yaml
+
+python examples/generate_catalogue.py \
+    --catalogue kino/config/catalogue_example.yaml --out mock_batch/
 ```
 
 `run_inference.py` is genuinely slow (nested sampling needs thousands of

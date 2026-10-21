@@ -55,6 +55,7 @@ nav:
       - Forecasting a target: manual/forecasting.md
       - Adding an instrument config: manual/adding-an-instrument.md
       - Running inference: manual/inference.md
+      - Batch mock generation: manual/batch-mocks.md
       - Conventions: manual/conventions.md
   - API reference:
       - kino.galaxy: api/galaxy.md
@@ -64,3 +65,4 @@ nav:
       - kino.analysis: api/analysis.md
       - kino.observing: api/observing.md
       - kino.io: api/io.md
+      - kino.mocks: api/mocks.md

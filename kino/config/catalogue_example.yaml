@@ -1,0 +1,64 @@
+# Example galaxy catalogue for kino.mocks.catalogue.generate_batch (README.md
+# Phase 4). Loads one instrument config, applies ONE global reduced shear
+# (g1, g2) to every galaxy -- kino treats the shear field this way
+# everywhere (every existing forecast/notebook assumes a single shear per
+# target); a spatially-varying shear field is out of scope.
+#
+# Exactly one of `galaxies` (explicit list, used below) or `population`
+# (sampled -- see the commented-out block) must be given.
+#
+# line_flux/line_wavelength are NOT DiscGalaxy fields -- they are
+# observation-level (passed to instrument.observe()), parsed the same way
+# every instrument config parses a physical value ("<value> <unit>").
+# Every other key in a galaxy row must be a kino.galaxy.DiscGalaxy
+# constructor field (r_e, inc, pa, v_flat are required; the rest default
+# as DiscGalaxy itself documents) -- an unknown key raises ValueError.
+
+instrument:
+  kind: ifu                        # "ifu" or "slit"
+  config: kino/config/sifs.yaml
+
+shear:
+  g1: 0.03
+  g2: -0.01
+
+seed: 42
+
+galaxies:
+  - r_e: 0.5
+    inc: 60
+    pa: 30
+    v_flat: 180
+    z: 0.10
+    sigma0: 30
+    line_flux: "1.0e-15 erg / (s cm2)"
+    line_wavelength: "0.65628 um"
+  - r_e: 0.8
+    inc: 45
+    pa: 10
+    v_flat: 220
+    z: 0.15
+    sigma0: 35
+    line_flux: "5.0e-15 erg / (s cm2)"
+    line_wavelength: "0.65628 um"
+
+# A sampled population instead of an explicit list -- uncomment this block
+# and delete `galaxies:` above. Supported distributions: `uniform`,
+# `loguniform` (both `low`/`high`), `lognormal` (`median`/`scatter_dex`,
+# log10 scatter -- same convention as kino.inference.priors.
+# tully_fisher_prior), or a bare fixed value (as `line_wavelength` below).
+# DiscGalaxy fields are plain floats (no `unit:` needed); `line_flux`/
+# `line_wavelength` are astropy Quantities, so a sampled value for either
+# needs an explicit `unit:` (appended to the drawn number before
+# kino.instruments.config.parse_quantity parses it).
+#
+# population:
+#   n: 50
+#   r_e: {dist: uniform, low: 0.3, high: 1.0}
+#   inc: {dist: uniform, low: 20, high: 80}
+#   pa: {dist: uniform, low: 0, high: 180}
+#   v_flat: {dist: lognormal, median: 180, scatter_dex: 0.1}
+#   z: {dist: uniform, low: 0.05, high: 0.5}
+#   sigma0: {dist: uniform, low: 20, high: 40}
+#   line_flux: {dist: loguniform, low: 1.0e-16, high: 1.0e-14, unit: "erg / (s cm2)"}
+#   line_wavelength: "0.65628 um"
