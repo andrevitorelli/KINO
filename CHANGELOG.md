@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
 
 ### Added
 
+- **README.md Phase 7 cluster-background proof of concept**:
+  `notebooks/15_cluster_background_poc.ipynb`. Five bright, independently-pointed background
+  discs at different projected radii/azimuths around one fiducial SIS cluster, each forward-
+  modelled and fit through the same fixed, already-validated SIFS fiducial setup
+  `scripts/run_phase6_ensemble.py` uses. Generalised notebook 11's single-axis SIS tangential-
+  shear derivation to the full 2-D `(g1, g2)` field and pinned the sign with a sanity check
+  against `kino/lensing/shear.py`'s reduced-shear phase convention. All five recovered tangential
+  shears track the SIS profile within their Fisher error bars, and the cross-shear null test is
+  consistent with zero -- a demonstration that KL's per-galaxy precision can trace a cluster
+  profile from a handful of sources, not a stacked survey.
 - **`kino.observing.GMT`**: a real observing site for the Giant Magellan Telescope (Las
   Campanas Peak), sourced from GMTO's own site page (29 02 54.0 S, 70 41 01.0 W, 2514 m,
   retrieved 2026-10-23) -- `kino.observing.Site` only predefines sites checked against a

@@ -440,7 +440,21 @@ summary level.
       model; `gmacs.yaml`'s own header already states this scope limit) -- 7
       of 15 detectable (stat S/N ≥ 3) at this flux/seeing, giving a stacked
       survey-level σ_g1 = 0.0022 from a typical per-galaxy 0.0059.
-- [ ] Cluster-background proof-of-concept scenario (O(1) bright galaxies).
+- [x] Cluster-background proof-of-concept scenario (O(1) bright galaxies).
+      `notebooks/15_cluster_background_poc.ipynb`: five bright, independently-pointed
+      background discs placed at different projected radii/azimuths around one fiducial SIS
+      cluster (same $M_{200}=10^{14}\,M_\odot$ placeholder as notebook 11), each forward-modelled
+      and fit through the same fixed, already-validated SIFS fiducial `shear_fisher`/
+      `IFUCubeLikelihood` setup `scripts/run_phase6_ensemble.py` uses -- deliberately not another
+      night/seeing-sweep forecast (notebooks 10/11/13/14 already cover that); the point is the
+      multi-target cluster geometry. Generalised the single-axis tangential-shear magnitude
+      notebook 11 derives to the full 2-D $(g_1,g_2)$ SIS field
+      ($g_1=-\gamma_t\cos2\phi$, $g_2=-\gamma_t\sin2\phi$, $\phi$ in KINO's own reduced-shear
+      phase convention -- `kino/lensing/shear.py`), pinned with a sign sanity check. All five
+      recovered tangential shears track the SIS profile within their (`sigma_fixed`, known-geometry)
+      Fisher error bars, and the $g_\times$ null test is consistent with zero (pulls -2.2 to 0.25)
+      -- a real, if single-realisation, demonstration that KL's per-galaxy precision can trace a
+      cluster profile from a handful of sources, not a stacked survey.
 - [x] Real-telescope IFU configs beyond SOAR, ahead of the public release:
       `kino/config/keck_kcwi.yaml` (Keck II KCWI), `kino/config/gemini_gmos_ifu.yaml`
       (Gemini South GMOS-IFU), `kino/config/vlt_muse.yaml` (VLT MUSE WFM, cropped to
