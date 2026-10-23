@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
 
 ## [Unreleased]
 
+### Fixed
+
+- **`scripts/build_skycalc_library.py`** could hang indefinitely on a stalled connection:
+  `skycalc_cli`'s own HTTP calls set no `timeout=`, so a single stalled request (not even an
+  error -- just no response) blocked forever rather than raising into the script's own
+  retry-with-backoff logic. Found from a real run (extending the library toward the near-infrared)
+  that printed its request count and then nothing further. Fixed by patching a default timeout
+  onto `requests.post`/`.get` before any request is made. Separately, progress was printed in
+  submission order (`executor.map`), so one slow-but-not-hung request among the first `--workers`
+  silently withheld every later completion's progress line, which looks identical to a hang even
+  when the pool is working fine -- switched to `as_completed` so progress reflects real completions.
+
 ### Added
 
 - **`kino.observing.sky.la_serena_worst_case_factor`**: quantifies the long-standing "Cerro

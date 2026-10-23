@@ -11,9 +11,16 @@ once, on a grid, and stores the result in ``data/skycalc/`` (git-ignored) as
 plain ``.npz`` files that ``SkyLibrary`` interpolates offline.
 
 Requires ``pip install skycalc-cli`` and network access. Interrupted runs
-resume: every server call is cached under ``data/skycalc/cache/``.
+resume: every server call is cached under ``data/skycalc/cache/``. Progress
+prints as requests actually complete (not in submission order), and every
+request carries a timeout (``_patch_requests_timeout``, since
+``skycalc_cli``'s own HTTP calls set none) -- a stalled connection now
+retries with backoff instead of hanging the whole run forever; both were
+found from a real run that printed its request count and then nothing
+further.
 
     python scripts/build_skycalc_library.py --workers 4
+    python scripts/build_skycalc_library.py --wmax 2500  # extend into the near-infrared
 
 Modelling choices baked into the library (see ``kino.observing.skymodel``):
 
@@ -33,11 +40,35 @@ import hashlib
 import io
 import json
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import numpy as np
+import requests
 from astropy.io import fits
+
+# skycalc_cli's own HTTP calls (requests.post/.get) pass no `timeout=`, so a
+# single stalled connection hangs forever rather than raising -- this script's
+# own retry-with-backoff in _query() never gets a chance to run. Patching a
+# default timeout here (before any SkyModel is constructed) turns a hang into
+# a normal, retried TimeoutError; found by a real run that looked "stuck"
+# after printing its request count with nothing further.
+_REQUEST_TIMEOUT_S = 30
+
+
+def _patch_requests_timeout() -> None:
+    for name in ("post", "get"):
+        orig = getattr(requests, name)
+        if getattr(orig, "_kino_timeout_patched", False):
+            continue
+
+        def wrapped(*args, _orig=orig, **kwargs):
+            kwargs.setdefault("timeout", _REQUEST_TIMEOUT_S)
+            return _orig(*args, **kwargs)
+
+        wrapped._kino_timeout_patched = True
+        setattr(requests, name, wrapped)
+
 
 # --- grids -----------------------------------------------------------------
 MOON_ELONGATION = [20.0, 45.0, 75.0, 105.0, 135.0, 160.0, 180.0]  # Sun-Moon sep; 180 = full
@@ -144,14 +175,18 @@ def build(out: Path, workers: int, wmin: float, wmax: float, dry_run: bool) -> N
         unique.setdefault(_key(p), p)
     print(f"{len(unique)} distinct requests")
 
-    def run(item):
-        h, p = item
-        return h, _query(cache, p)
-
     fetched, t0 = {}, time.time()
+    # as_completed (not executor.map) reports progress as requests actually
+    # finish, not in submission order -- with executor.map, one slow/stuck
+    # request among the first `workers` silently withholds every later
+    # result's progress line even though the pool keeps working behind it,
+    # which looks identical to a true hang. See _patch_requests_timeout()
+    # above for why a request can actually hang rather than fail.
     with ThreadPoolExecutor(max_workers=workers) as ex:
-        for i, (h, res) in enumerate(ex.map(run, unique.items()), 1):
-            fetched[h] = res
+        futures = {ex.submit(_query, cache, p): h for h, p in unique.items()}
+        for i, fut in enumerate(as_completed(futures), 1):
+            h = futures[fut]
+            fetched[h] = fut.result()
             if i % 25 == 0 or i == len(unique):
                 print(f"  {i}/{len(unique)}  {time.time() - t0:.0f}s", flush=True)
     results = {k: fetched[_key(p)] for k, p in jobs.items()}
@@ -214,4 +249,5 @@ if __name__ == "__main__":
     ap.add_argument("--wmax", type=float, default=1000.0, help="nm")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
+    _patch_requests_timeout()
     build(a.out, a.workers, a.wmin, a.wmax, a.dry_run)
