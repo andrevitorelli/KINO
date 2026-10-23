@@ -17,7 +17,11 @@ request carries a timeout (``_patch_requests_timeout``, since
 ``skycalc_cli``'s own HTTP calls set none) -- a stalled connection now
 retries with backoff instead of hanging the whole run forever; both were
 found from a real run that printed its request count and then nothing
-further.
+further -- that turned out to be an unrelated, real connectivity problem
+(as of 2026-10-23, ``etimecalret-002.eso.org`` and the whole
+``134.171.46.0/24`` ESO "etc" subnet are unreachable from two separate,
+unrelated networks at the TCP level, not a DNS/proxy/VPN/request-volume
+issue on the client side -- reported to ESO; retry once resolved).
 
     python scripts/build_skycalc_library.py --workers 4
     python scripts/build_skycalc_library.py --wmax 2500  # extend into the near-infrared

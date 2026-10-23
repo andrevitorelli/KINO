@@ -47,7 +47,16 @@ binding constraint (it stops at 1 micron, built from ESO SkyCalc, see
 network access to ESO's SkyCalc API host
 (``etimecalret-002.eso.org``); that host was unreachable (TCP connect
 timeout, not a DNS or code issue) from the sandbox this module was written
-in. This module is usable standalone today (e.g. to extinction-correct a
+in. **2026-10-23 update**: the user independently confirmed the same
+TCP-level unreachability from a separate, unrelated network (VPN off, no
+proxy, IPv4 forced, DNS identical across three resolvers, traceroute unable
+to route there at all) -- the whole ``134.171.46.0/24`` ESO exposure-time-
+calculator subnet (``etimecalret-002``/``etimecal`` both on it) appears
+unreachable from outside, while ``www.eso.org`` (a different subnet) is
+fine, pointing to a problem on ESO's side (or just upstream of it), not a
+sandbox artefact or a client/request-volume issue. Reported to ESO; retry
+``scripts/build_skycalc_library.py --wmax <nm>`` once that's resolved. This
+module is usable standalone today (e.g. to extinction-correct a
 J/H/Ks-band line flux by hand, as ``notebooks/13_gmtifs_forecast.ipynb``'s
 own `shear_fisher`-direct workaround could), but ``gmtifs.yaml``'s own
 1.10-1.14 um demo window falls just short of the J range above

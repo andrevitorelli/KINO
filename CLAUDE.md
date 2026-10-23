@@ -378,8 +378,12 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   sky-spectrum library's own 1 micron ceiling (next bullet), not extinction. Extending that
   library needs a live SkyCalc API call (`scripts/build_skycalc_library.py --wmax <nm>`), and
   that service's host (`etimecalret-002.eso.org`) was unreachable (TCP connect timeout, not
-  DNS/code) from the sandbox this module was written in -- run the script from an environment
-  with that network access to actually extend it.
+  DNS/code) from the sandbox this module was written in. **2026-10-23**: independently confirmed
+  unreachable (same symptom) from the user's own, unrelated network too -- VPN off, no proxy,
+  IPv4 forced, DNS identical across three resolvers, traceroute can't route there at all -- the
+  whole `134.171.46.0/24` ESO "etc" subnet looks down/blocked from outside while `www.eso.org`
+  (a different subnet) is fine, pointing to an ESO-side (or just-upstream) problem, not a sandbox
+  artefact; reported to ESO. Retry the script once that's resolved.
 - **Forecasts (`kino.analysis.fisher`, `kino.analysis.forecast`, `kino.io.spectrum`):**
   `shear_fisher` is a Fisher/Cramer-Rao bound on `(g1, g2)` through the same forward model as the
   likelihoods, and takes **either an `IFU` or a `SlitSpectrograph`** (duck-typed: `estimator="cube"`
