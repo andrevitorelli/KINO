@@ -405,9 +405,18 @@ summary level.
       not this pipeline's -- an `intrinsic_sigma` sensitivity comparison remains available).
       `kino/config/goodman.yaml` gives SOAR Goodman real geometry/detector numbers with a
       throughput derived from a real on-sky standard-star measurement (see the file's own
-      caveats -- wrong grating, one star one night). **Not done**: date ranges and batching
-      over a private candidate list, Cerro Pachon corrections to the Paranal sky model, and
-      the near-infrared (sky library ends at 1 micron).
+      caveats -- wrong grating, one star one night). Also done, partial: the near-infrared
+      now has a real extinction curve (`kino.observing.extinction_nir`, broadband CTIO J/H/Ks
+      means from Nikolaev et al. 2000/Frogel 1998, windowed by Cohen et al. 2003's isophotal
+      bandwidths, no interpolation across the telluric gaps between bands) -- but this alone
+      does not unblock `forecast_ifu`/`forecast_slit` for NIR targets, since their sky-spectrum
+      library (ESO SkyCalc) is still the binding constraint and still stops at 1 micron;
+      extending it needs a live SkyCalc API call, and that service's host was unreachable
+      (TCP connect timeout) from the sandbox session that added the extinction curve --
+      `scripts/build_skycalc_library.py --wmax <nm>` is ready to run from an environment with
+      that network access. **Not done**: date ranges and batching over a private candidate
+      list, Cerro Pachon corrections to the Paranal sky model, and the sky-library's own
+      near-infrared extension (blocked as above).
 - [x] GMTIFS-like forecast: AO PSF, 25–50 mas spaxels, 4″×2″ field, R≈5–10k,
       0.9–2.5 µm; Hα/[O III] kinematics of z≈0.4–1.5 background discs.
       `notebooks/13_gmtifs_forecast.ipynb`, at a real site

@@ -17,6 +17,12 @@ from kino.observing.conditions import (
     target_track,
 )
 from kino.observing.extinction import atmospheric_transmission, extinction_coefficient
+from kino.observing.extinction_nir import (
+    NIR_EXTINCTION_BANDS,
+    NIR_EXTINCTION_FROGEL,
+    nir_atmospheric_transmission,
+    nir_extinction_coefficient,
+)
 from kino.observing.night import Night, night_window
 from kino.observing.site import GMT, SOAR, Site
 from kino.observing.sky import (
@@ -41,6 +47,8 @@ __all__ = [
     "NOAA_SWPC_F107_PREDICTION",
     "CTIO_DARK_SKY",
     "GMT",
+    "NIR_EXTINCTION_BANDS",
+    "NIR_EXTINCTION_FROGEL",
     "SOAR",
     "MoonState",
     "Night",
@@ -60,6 +68,8 @@ __all__ = [
     "moon_state",
     "nanolamberts_from_mag",
     "night_window",
+    "nir_atmospheric_transmission",
+    "nir_extinction_coefficient",
     "seeing_at",
     "solar_flux",
     "sky_brightness_v",

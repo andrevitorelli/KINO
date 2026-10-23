@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
 
 ### Added
 
+- **`kino.observing.extinction_nir`**: a real, measured near-infrared (J/H/Ks) broadband
+  atmospheric extinction curve for CTIO (assumed for Cerro Pachon), extending
+  `kino.observing.extinction`'s optical-only (3200-10870 A) coverage. Primary values from
+  Nikolaev et al. (2000, AJ, 120, 3340), with Frogel (1998, PASP, 110, 200) kept for comparison
+  (the two disagree beyond their quoted errors in H/Ks -- a real, unresolved literature gap).
+  Deliberately does not interpolate between J/H/Ks (that would cross real telluric water-vapour
+  absorption bands); raises `ValueError` outside each band's own isophotal-bandwidth window
+  (Cohen, Wheaton & Megeath 2003, AJ, 126, 1090) instead. Does **not** by itself unblock
+  `forecast_ifu`/`forecast_slit` for NIR targets -- their sky-spectrum library (ESO SkyCalc)
+  remains the binding 1-micron constraint, and extending it needs a live SkyCalc API call that
+  was unreachable (TCP connect timeout to `etimecalret-002.eso.org`, not a DNS or code issue)
+  from the session that added this curve.
 - **README.md Phase 7 cluster-background proof of concept**:
   `notebooks/15_cluster_background_poc.ipynb`. Five bright, independently-pointed background
   discs at different projected radii/azimuths around one fiducial SIS cluster, each forward-

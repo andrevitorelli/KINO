@@ -353,7 +353,20 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   `sky_electron_rate` on the same collecting area and throughput as the source.
   **Extinction:** `kino.observing.extinction` is the IRAF/CTIO mean curve
   (Stone & Baldwin 1983; Baldwin & Stone 1984), measured at Tololo and assumed at
-  Pachon, with no per-night aerosol variation and no cloud.
+  Pachon, with no per-night aerosol variation and no cloud; it covers only 3200-10870 A
+  (optical). `kino.observing.extinction_nir` adds the near-infrared as three real, measured
+  **broadband** (not continuous) CTIO J/H/Ks means (Nikolaev et al. 2000, AJ, 120, 3340,
+  primary; Frogel 1998, PASP, 110, 200, kept for comparison -- the two disagree by more than
+  their quoted errors in H/Ks, a real unresolved literature gap). `nir_extinction_coefficient`
+  never interpolates between J/H/Ks (that would cross real telluric water-vapour absorption
+  bands near 1.4/1.9 um) -- it raises `ValueError` outside each band's own isophotal-bandwidth
+  window (Cohen, Wheaton & Megeath 2003, AJ, 126, 1090). This does **not** by itself unblock
+  `forecast_ifu`/`forecast_slit` for NIR targets: their binding constraint is still the
+  sky-spectrum library's own 1 micron ceiling (next bullet), not extinction. Extending that
+  library needs a live SkyCalc API call (`scripts/build_skycalc_library.py --wmax <nm>`), and
+  that service's host (`etimecalret-002.eso.org`) was unreachable (TCP connect timeout, not
+  DNS/code) from the sandbox this module was written in -- run the script from an environment
+  with that network access to actually extend it.
 - **Forecasts (`kino.analysis.fisher`, `kino.analysis.forecast`, `kino.io.spectrum`):**
   `shear_fisher` is a Fisher/Cramer-Rao bound on `(g1, g2)` through the same forward model as the
   likelihoods, and takes **either an `IFU` or a `SlitSpectrograph`** (duck-typed: `estimator="cube"`
