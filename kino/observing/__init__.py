@@ -28,6 +28,7 @@ from kino.observing.site import GMT, SOAR, Site
 from kino.observing.sky import (
     CTIO_DARK_SKY,
     dark_sky_brightness,
+    la_serena_worst_case_factor,
     mag_from_nanolamberts,
     moonlight_brightness,
     nanolamberts_from_mag,
@@ -63,6 +64,7 @@ __all__ = [
     "ecliptic_from_sun",
     "extinction_coefficient",
     "ifu_sky_electron_rate",
+    "la_serena_worst_case_factor",
     "mag_from_nanolamberts",
     "moonlight_brightness",
     "moon_state",

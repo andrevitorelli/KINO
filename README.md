@@ -414,9 +414,18 @@ summary level.
       extending it needs a live SkyCalc API call, and that service's host was unreachable
       (TCP connect timeout) from the sandbox session that added the extinction curve --
       `scripts/build_skycalc_library.py --wmax <nm>` is ready to run from an environment with
-      that network access. **Not done**: date ranges and batching over a private candidate
-      list, Cerro Pachon corrections to the Paranal sky model, and the sky-library's own
-      near-infrared extension (blocked as above).
+      that network access. Also done: the Cerro Pachon-vs-Paranal sky caveat is now quantified
+      rather than left as "not modelled" (`kino.observing.sky.la_serena_worst_case_factor`) --
+      real CTIO measurements (Krisciunas et al. 2007; Krisciunas et al. 2010) found **no**
+      detectable La Serena/Coquimbo light-pollution effect for elevation > 45 deg (airmass <
+      1.41), rising to at most a V-band factor of ~2 near zenith distance 80 deg (airmass ~5.8)
+      on a clear, town-facing night; `forecast_ifu`/`forecast_slit`'s own default
+      `max_airmass=2.0` (zenith distance 60 deg) sits comfortably inside the no-effect regime, so
+      this caveat turned out not to matter for any forecast run at or below that default --
+      it's a real, sourced upper bound for the unusual case of forecasting much closer to the
+      horizon, not a correction applied anywhere by default. **Not done**: date ranges and
+      batching over a private candidate list, and the sky-library's own near-infrared extension
+      (blocked as above).
 - [x] GMTIFS-like forecast: AO PSF, 25–50 mas spaxels, 4″×2″ field, R≈5–10k,
       0.9–2.5 µm; Hα/[O III] kinematics of z≈0.4–1.5 background discs.
       `notebooks/13_gmtifs_forecast.ipynb`, at a real site

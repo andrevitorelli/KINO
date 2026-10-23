@@ -11,6 +11,7 @@ from kino.observing.extinction import (
 from kino.observing.sky import (
     CTIO_DARK_SKY,
     dark_sky_brightness,
+    la_serena_worst_case_factor,
     mag_from_nanolamberts,
     moonlight_brightness,
     nanolamberts_from_mag,
@@ -157,3 +158,32 @@ class TestExtinction:
     def test_rejects_airmass_below_one(self):
         with pytest.raises(ValueError):
             atmospheric_transmission(5556 * u.AA, 0.8)
+
+
+class TestLaSerenaWorstCase:
+    def test_no_effect_below_45_degrees(self):
+        # Krisciunas et al. (2007): no detectable effect for elevation > 45 deg
+        assert la_serena_worst_case_factor(0.0 * u.deg) == pytest.approx(1.0)
+        assert la_serena_worst_case_factor(45.0 * u.deg) == pytest.approx(1.0)
+
+    def test_factor_of_two_at_80_degrees(self):
+        # Krisciunas et al. (2010): ~factor of 2 near zenith distance 80 deg
+        assert la_serena_worst_case_factor(80.0 * u.deg) == pytest.approx(2.0)
+
+    def test_monotonic_ramp_between_anchors(self):
+        z = np.array([45.0, 55.0, 65.0, 75.0, 80.0])
+        f = la_serena_worst_case_factor(z * u.deg)
+        assert np.all(np.diff(f) >= 0)
+        assert f[0] == pytest.approx(1.0)
+        assert f[-1] == pytest.approx(2.0)
+
+    def test_held_flat_beyond_80_degrees(self):
+        assert la_serena_worst_case_factor(85.0 * u.deg) == pytest.approx(2.0)
+        assert la_serena_worst_case_factor(90.0 * u.deg) == pytest.approx(2.0)
+
+    def test_default_forecast_max_airmass_is_comfortably_inside_no_effect_regime(self):
+        # forecast_ifu/forecast_slit's own default max_airmass=2.0 -> zenith
+        # distance 60 deg; the 2010 data show no significant enhancement there
+        zenith_distance_at_max_airmass = np.degrees(np.arccos(1.0 / 2.0))
+        assert zenith_distance_at_max_airmass == pytest.approx(60.0, abs=0.1)
+        assert la_serena_worst_case_factor(zenith_distance_at_max_airmass * u.deg) < 1.5

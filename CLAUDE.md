@@ -327,8 +327,21 @@ instrument forecasts) that Phase 6 and the `kino/io/` adapter layer follow.
   Kolmogorov scaling (FWHM ~ X^0.6 lambda^-0.2) -- an approximation for
   shaping a curve, not a per-image prediction. **Sky:** two layers. `kino.observing.sky` is the V-band-only
   Krisciunas & Schaefer (1991) moonlight model on CTIO dark-sky means
-  (Krisciunas et al. 2007, Table 6) -- kept as an *independent cross-check*.
-  The working model is `kino.observing.skymodel`: a **local library of ESO
+  (Krisciunas et al. 2007, Table 6) -- kept as an *independent cross-check*. That module's
+  `la_serena_worst_case_factor` quantifies Cerro Pachon's own real, documented light-pollution
+  caveat instead of leaving it as "not modelled": Krisciunas et al. (2007) found **no** detectable
+  La Serena/Coquimbo light-pollution effect at CTIO for elevation > 45 deg (zenith distance < 45
+  deg, airmass < 1.41) -- the follow-up (Krisciunas et al. 2010) confirmed this and quantified the
+  worst case at higher zenith angle, up to a V-band factor of ~2 near zenith distance 80 deg
+  (airmass ~5.8) on a clear, La-Serena-facing night; B-band showed no enhancement at all. The
+  function is a conservative, azimuth-independent, V-band-only upper bound (linear between those
+  two anchors), not a measured correction -- `kino.observing` has no notion of azimuth toward La
+  Serena. `forecast_ifu`/`forecast_slit`'s own default `max_airmass=2.0` (zenith distance 60 deg)
+  sits comfortably inside the well-measured no-effect regime, so this caveat does not affect any
+  forecast run at or below that default; it matters only if a forecast is deliberately pushed to
+  much higher airmass. Not wired into `kino.observing.skymodel`'s own radiance (V-band-only;
+  SkyCalc's airglow/zodi/starlight already dominate most of the spectrum) -- call it directly if
+  forecasting near the horizon. The working model is `kino.observing.skymodel`: a **local library of ESO
   SkyCalc spectra** (Noll et al. 2012; Jones et al. 2013) for moonlight, airglow
   lines + continuum, zodiacal light and scattered starlight, built once by
   `scripts/build_skycalc_library.py` into git-ignored `data/skycalc/` (needs

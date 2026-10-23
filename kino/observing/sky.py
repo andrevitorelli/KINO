@@ -3,7 +3,10 @@
 Implements the moonlight model of Krisciunas & Schaefer (1991, PASP 103, 1033;
 equations 1-3 and 15-22 as summarised in their Section 5) and the CTIO
 dark-sky levels of Krisciunas et al. (2007, PASP 119, 687; arXiv:0705.1153,
-Table 6).
+Table 6). :func:`la_serena_worst_case_factor` adds a conservative, V-band-only
+upper bound on La Serena/Coquimbo light pollution at high zenith angle, from
+the same 2007 paper and its 2010 follow-up (Krisciunas, Bogglio, Sanhueza &
+Smith, PASP 122, 373; arXiv:1001.2246) -- see that function's own docstring.
 
 What this is *not*: it is V band only. The moon term has no colour model yet,
 so nothing here gives a sky brightness at an arbitrary wavelength or a sky
@@ -141,3 +144,41 @@ def sky_brightness_v(
         "total_mag": mag_from_nanolamberts(total),
         "delta_v": -2.5 * np.log10(total / dark),
     }
+
+
+def la_serena_worst_case_factor(zenith_distance: u.Quantity) -> np.ndarray:
+    """Worst-case V-band light-pollution enhancement from La Serena/Coquimbo at
+    Cerro Tololo (assumed for Cerro Pachon, ~10 km away), vs. zenith distance.
+
+    Krisciunas et al. (2007, PASP, 119, 687; arXiv:0705.1153) found **no**
+    detectable effect of the towns' artificial light for elevation > 45 deg
+    (zenith distance < 45 deg, airmass < 1.41) -- only below 45 deg elevation
+    does La Serena's glow become measurable (visible from ~10 deg elevation).
+    Krisciunas, Bogglio, Sanhueza & Smith (2010, PASP, 122, 373;
+    arXiv:1001.2246) confirmed this with new data and quantified the worst
+    case: on a clear night (no marine cloud layer over La Serena/Coquimbo),
+    facing directly toward the town (azimuth roughly 260-310 deg in their
+    data), V-band flux reached up to a factor of ~2 (44-72% excess) above the
+    Garstang (1989) model near zenith distance 80 deg (airmass ~5.8); B-band
+    showed **no** corresponding enhancement at all, and a similarly high
+    zenith angle toward Andacollo (a smaller, less light-polluted town, a
+    different azimuth) also showed none.
+
+    This returns a **conservative, azimuth-independent upper bound**, not a
+    measured correction: 1.0 (no effect) below 45 deg zenith distance,
+    linearly ramping to 2.0 by 80 deg (a simple interpolation of the two
+    papers' own anchor points, not a physical radiative-transfer model --
+    ``kino.observing`` has no notion of "direction toward La Serena" to do
+    better), held flat at 2.0 beyond 80 deg (unverified extrapolation past
+    the papers' own data). V-band only; nothing here applies to B or other
+    bands, where the effect was not detected. ``forecast_ifu``/
+    ``forecast_slit``'s own default ``max_airmass=2.0`` corresponds to
+    zenith distance 60 deg -- comfortably inside the well-measured
+    no-detectable-effect regime (<~70 deg in the 2010 data) for any forecast
+    run at that default or lower; this function exists for the unusual case
+    of deliberately forecasting at much higher airmass.
+    """
+    z = np.asarray(u.Quantity(zenith_distance).to_value(u.deg), dtype=float)
+    lo, hi = 45.0, 80.0
+    frac = np.clip((z - lo) / (hi - lo), 0.0, 1.0)
+    return 1.0 + frac

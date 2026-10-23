@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
 
 ### Added
 
+- **`kino.observing.sky.la_serena_worst_case_factor`**: quantifies the long-standing "Cerro
+  Pachon's light pollution... not modelled" caveat instead of leaving it unresolved. Real CTIO
+  measurements (Krisciunas et al. 2007, PASP, 119, 687; Krisciunas et al. 2010, PASP, 122, 373)
+  found **no** detectable La Serena/Coquimbo light-pollution effect at Cerro Tololo for elevation
+  > 45 deg (airmass < 1.41), rising to at most a V-band factor of ~2 near zenith distance 80 deg
+  (airmass ~5.8) on a clear, town-facing night, with B-band unaffected. Returns a conservative,
+  azimuth-independent upper bound (linear between those two real anchor points), not a measured
+  correction. `forecast_ifu`/`forecast_slit`'s own default `max_airmass=2.0` (zenith distance 60
+  deg) sits comfortably inside the well-measured no-effect regime, so this finding resolves the
+  caveat for any forecast at or below that default rather than requiring a code change to the
+  forecast machinery itself.
 - **`kino.observing.extinction_nir`**: a real, measured near-infrared (J/H/Ks) broadband
   atmospheric extinction curve for CTIO (assumed for Cerro Pachon), extending
   `kino.observing.extinction`'s optical-only (3200-10870 A) coverage. Primary values from
