@@ -423,9 +423,18 @@ summary level.
       `max_airmass=2.0` (zenith distance 60 deg) sits comfortably inside the no-effect regime, so
       this caveat turned out not to matter for any forecast run at or below that default --
       it's a real, sourced upper bound for the unusual case of forecasting much closer to the
-      horizon, not a correction applied anywhere by default. **Not done**: date ranges and
-      batching over a private candidate list, and the sky-library's own near-infrared extension
-      (blocked as above).
+      horizon, not a correction applied anywhere by default. Also done: a reusable date-range/
+      multi-target batching layer, `kino.analysis.semester` (`forecast_over_nights`,
+      `rank_candidates`, `semester_dates`) -- loops `forecast_ifu`/`forecast_slit` over a semester
+      of nights (the right month's NOAA solar flux looked up automatically) and/or a list of
+      candidate targets, collapsing each night to its single best `(time, seeing)` point and
+      ranking targets by their best achievable S/N; a structurally bad target (e.g. a line outside
+      the instrument's coverage) marks that one target undetectable in `rank_candidates` rather
+      than aborting the whole batch. Reuses the existing single-night forecast as its only engine
+      (no new physics) -- tested with synthetic targets only, per `CLAUDE.md`'s rule that a real
+      candidate list never goes in the repo; the private, per-session candidate work this interface
+      was requested for (2026-09-26) stays in the gitignored `proposals/` tree. **Not done**: the
+      sky-library's own near-infrared extension (blocked as above).
 - [x] GMTIFS-like forecast: AO PSF, 25–50 mas spaxels, 4″×2″ field, R≈5–10k,
       0.9–2.5 µm; Hα/[O III] kinematics of z≈0.4–1.5 background discs.
       `notebooks/13_gmtifs_forecast.ipynb`, at a real site

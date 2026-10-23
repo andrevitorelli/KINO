@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
 
 ## [Unreleased]
 
+### Added
+
+- **`kino.analysis.semester`**: a date-range/multi-target batching layer on top of the existing
+  single-night `forecast_ifu`/`forecast_slit` -- `forecast_over_nights` loops a target's forecast
+  across a semester of dates (looking up the right month's NOAA F10.7 automatically, and
+  collapsing each night to its single best `(time, seeing)` point), `rank_candidates` does the
+  same for a list of targets and sorts by best achievable shear S/N (one structurally bad target
+  doesn't abort the batch), and `semester_dates` builds an evenly strided date range. Requested
+  interface (2026-09-26): "given a telescope/detector, a spectrum, RA/Dec, night and expected
+  shear -> S/N vs. seeing... batch it over a candidate list to find the optimal candidates across
+  a semester" -- this was previously done ad hoc, looped externally per private proposal, per
+  `docs/manual/forecasting.md`'s own earlier note; now a real, tested, reusable part of the
+  library. No new physics (reuses `forecast_ifu`/`forecast_slit` as its only engine); tested with
+  synthetic targets only, since a real candidate list never goes in the repo.
+
 ### Fixed
 
 - **`scripts/build_skycalc_library.py`** could hang indefinitely on a stalled connection:

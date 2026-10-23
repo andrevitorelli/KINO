@@ -63,11 +63,34 @@ a safe choice.
 
 `forecast_ifu`/`forecast_slit` already tile `(time, seeing)` through one
 night for you (that's what the loop over `night.times` inside them does).
-To scan multiple candidate nights across a semester, call them once per
-date with `night_window(SOAR, date)` and `solar_flux(date[:7])` for each
-date — this is exactly what the semester-visibility scans in
-`notebooks/10_sifs_forecast.ipynb`/`notebooks/11_goodman_forecast.ipynb`
-do, just looped externally rather than built into the function itself.
+To scan multiple candidate nights across a semester — and, for a real
+proposal, to rank several candidate targets against each other —
+`kino.analysis.semester` loops the per-night forecast for you:
+
+```python
+from kino.analysis.semester import semester_dates, forecast_over_nights, rank_candidates
+
+dates = semester_dates("2027-05-01", "2027-11-30", step_days=7)  # weekly stride
+
+nightly = forecast_over_nights(
+    ifu, target, dates, lib,
+    g=(0.14, 0.0), seeing_ref=[1.0] * u.arcsec, site=SOAR, time_step=180 * u.min,
+)
+print(nightly.summary())   # the single best night across the whole range
+
+# several candidates (never commit a real target list -- see CLAUDE.md), ranked:
+ranked = rank_candidates(ifu, [target_a, target_b, target_c], dates, lib, g=(0.14, 0.0),
+                          seeing_ref=[1.0] * u.arcsec, site=SOAR)
+```
+
+Each night collapses to its single best `(time, seeing)` point (not the
+full grid) and the right month's solar flux is looked up for you — pass
+`solar_flux_fn` to cover dates outside the tabulated NOAA months. Keep
+`seeing_ref` to one or two values and `step_days`/`time_step` coarse for
+an exploratory scan across many nights or candidates; this is still the
+same per-point `shear_fisher` cost as a single-night forecast, multiplied
+by every date and target, so a full semester at a fine grid is slow (see
+the module's own docstring for the cost trade-off).
 
 ## IFU vs. slit
 
