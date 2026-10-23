@@ -4,6 +4,21 @@
 
 *(kino - the German word for cinema - from the Greek *kinema*, "movement")*
 
+<p align="center">
+  <img src="assets/velocity_maps/sifs.png" width="190" alt="Synthetic velocity map through SOAR/SIFS">
+  <img src="assets/velocity_maps/gmtifs.png" width="190" alt="Synthetic velocity map through GMT/GMTIFS">
+  <img src="assets/velocity_maps/keck_kcwi.png" width="190" alt="Synthetic velocity map through Keck/KCWI">
+  <img src="assets/velocity_maps/gemini_gmos_ifu.png" width="190" alt="Synthetic velocity map through Gemini South/GMOS-IFU">
+  <br>
+  <img src="assets/velocity_maps/vlt_muse.png" width="190" alt="Synthetic velocity map through VLT/MUSE">
+  <img src="assets/velocity_maps/gemini_nifs.png" width="190" alt="Synthetic velocity map through Gemini North/NIFS">
+  <img src="assets/velocity_maps/keck_osiris.png" width="190" alt="Synthetic velocity map through Keck/OSIRIS">
+</p>
+<p align="center"><sub>Synthetic, sheared line-of-sight velocity fields rendered through KINO's own
+<code>IFU</code> pipeline for each instrument's real/fiducial config (<code>kino/config/</code>) --
+illustrative only, not a forecast for any real target. Regenerate with
+<code>scripts/make_readme_velocity_maps.py</code>.</sub></p>
+
 KINO is a Python toolkit to **simulate** and **test the inference of kinematic
 lensing (KL)** - the measurement of weak gravitational shear from the distorted
 velocity field of an individual disc galaxy. It is built to work across both
