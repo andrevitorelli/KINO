@@ -18,7 +18,7 @@ from kino.observing.conditions import (
 )
 from kino.observing.extinction import atmospheric_transmission, extinction_coefficient
 from kino.observing.night import Night, night_window
-from kino.observing.site import SOAR, Site
+from kino.observing.site import GMT, SOAR, Site
 from kino.observing.sky import (
     CTIO_DARK_SKY,
     dark_sky_brightness,
@@ -40,6 +40,7 @@ from kino.observing.solar import NOAA_SWPC_F107_PREDICTION, solar_flux
 __all__ = [
     "NOAA_SWPC_F107_PREDICTION",
     "CTIO_DARK_SKY",
+    "GMT",
     "SOAR",
     "MoonState",
     "Night",

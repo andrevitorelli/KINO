@@ -53,3 +53,23 @@ SOAR = Site(
         height=2738.0 * u.m,
     ),
 )
+
+#: Giant Magellan Telescope, Las Campanas Peak (Las Campanas Observatory's
+#: highest point, ~2 km south of the main LCO site Mamajek (2013) covers --
+#: not the same mountain as SOAR/Cerro Pachon, so this needed its own
+#: source). Geodetic 29 02 54.0 S, 70 41 01.0 W, 2514 m: GMTO's own site
+#: page (https://giantmagellan.org/location/, retrieved 2026-10-23), quoted
+#: as "altitude" -- presumed orthometric (MSL), not explicitly stated as
+#: GPS ellipsoidal height the way SOAR's Mamajek (2013) figure is. The
+#: geoid-ellipsoid offset in this region is tens of metres at most,
+#: negligible for airmass/parallactic-angle/moon-geometry purposes at
+#: kino.observing's own stated precision (see this module's siblings'
+#: caveats on RA-of-date precession, ~0.3 deg after 25 years).
+GMT = Site(
+    name="GMT",
+    location=EarthLocation.from_geodetic(
+        lon=_dms(-1, 70, 41, 1.0),
+        lat=_dms(-1, 29, 2, 54.0),
+        height=2514.0 * u.m,
+    ),
+)

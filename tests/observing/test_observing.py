@@ -5,6 +5,7 @@ from astropy.coordinates import ICRS, TETE, SkyCoord
 from astropy.time import Time
 
 from kino.observing import (
+    GMT,
     SOAR,
     airmass_from_altitude,
     moon_state,
@@ -20,6 +21,12 @@ class TestSite:
         assert SOAR.latitude.deg == pytest.approx(-(30 + 14 / 60 + 16.41 / 3600), abs=1e-9)
         assert SOAR.longitude.deg == pytest.approx(-(70 + 44 / 60 + 1.11 / 3600), abs=1e-9)
         assert SOAR.location.height.to_value(u.m) == pytest.approx(2738.0, abs=0.01)
+
+    def test_gmt_coordinates_match_the_published_geodetic_position(self):
+        # GMTO's own site page, https://giantmagellan.org/location/, retrieved 2026-10-23
+        assert GMT.latitude.deg == pytest.approx(-(29 + 2 / 60 + 54.0 / 3600), abs=1e-9)
+        assert GMT.longitude.deg == pytest.approx(-(70 + 41 / 60 + 1.0 / 3600), abs=1e-9)
+        assert GMT.location.height.to_value(u.m) == pytest.approx(2514.0, abs=0.01)
 
 
 class TestNightWindow:
