@@ -10,6 +10,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
 
 ### Added
 
+- **`kino.observing.GMT`**: a real observing site for the Giant Magellan Telescope (Las
+  Campanas Peak), sourced from GMTO's own site page (29 02 54.0 S, 70 41 01.0 W, 2514 m,
+  retrieved 2026-10-23) -- `kino.observing.Site` only predefines sites checked against a
+  primary source, and SOAR (Mamajek 2013, Cerro Tololo/Pachon only) was the only one so far.
+- **README.md Phase 7 GMTIFS-like forecast**: `notebooks/13_gmtifs_forecast.ipynb`, at the new
+  real GMT site. Found a real, generalisable gap: `forecast_ifu`/`forecast_slit` always convert
+  a swept ground-based seeing into the instrument's PSF, with no way to hold an AO-corrected PSF
+  fixed through a night (also affects `gemini_nifs.yaml`/`keck_osiris.yaml`) -- not fixed here
+  (kept as a case-study notebook, not a forecast-machinery change), worked around by calling
+  `shear_fisher` directly at `gmtifs.yaml`'s own fixed fiducial AO PSF/sky rate. Also found the
+  sky-spectrum library (1 µm) and CTIO extinction curve (1087 nm) both end short of
+  `gmtifs.yaml`'s 1.10-1.14 µm window -- already-documented "optical only" scope, just the first
+  thing to actually hit it.
+- **README.md Phase 7 MANIFEST+GMACS-like forecast**: `notebooks/14_manifest_gmacs_forecast.ipynb`.
+  Unlike GMTIFS, GMACS is seeing-limited (no AO) and its 0.50-0.52 µm window is well inside the
+  sky-spectrum library/extinction curve's real coverage, so `forecast_slit` applies cleanly for
+  one slitlet through a real GMT night. "Survey-scale multiplex" is demonstrated as a synthetic
+  15-slitlet population forecast independently and combined (not a real multi-object simulation
+  -- `SlitSpectrograph` models one slit only, no shared detector/overlapping traces/fibre-
+  positioner model; `gmacs.yaml`'s own header already states this) -- 7/15 detectable at this
+  flux/seeing, stacked survey-level sigma_g1=0.0022 from a typical per-galaxy 0.0059. Building
+  it caught a real test-design bug before it looked like a false "all undetectable" result: a
+  swept redshift range put [O II] outside `gmacs.yaml`'s narrow demo window for most of the
+  range, not a forecast problem.
 - **README.md Phase 6 ensemble validation, complete**: `scripts/run_phase6_ensemble.py`
   (results: `notebooks/data/phase6_ensemble.json`) runs all six remaining ensemble bullets
   (bias vs. S/N/size/inclination/shear amplitude, shape noise, (m, c), null tests, a published-

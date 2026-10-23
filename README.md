@@ -380,7 +380,9 @@ summary level.
 
 ### Phase 7 — Instrument case studies
 - [ ] Observing-conditions layer (`kino.observing`), so a target + night gives
-      S/N vs. seeing. Done: site (SOAR, coordinates from Mamajek 2013), the dark
+      S/N vs. seeing. Done: site (SOAR, coordinates from Mamajek 2013; GMT/Las
+      Campanas added 2026-10-23 from GMTO's own site page, for the GMTIFS/GMACS
+      forecasts below), the dark
       window of a night, target airmass and parallactic angle, moon
       illumination/altitude/separation, and the Kolmogorov seeing scaling with
       airmass and wavelength; the CTIO mean extinction curve; V-band moonlit sky
@@ -406,10 +408,38 @@ summary level.
       caveats -- wrong grating, one star one night). **Not done**: date ranges and batching
       over a private candidate list, Cerro Pachon corrections to the Paranal sky model, and
       the near-infrared (sky library ends at 1 micron).
-- [ ] GMTIFS-like forecast: AO PSF, 25–50 mas spaxels, 4″×2″ field, R≈5–10k,
+- [x] GMTIFS-like forecast: AO PSF, 25–50 mas spaxels, 4″×2″ field, R≈5–10k,
       0.9–2.5 µm; Hα/[O III] kinematics of z≈0.4–1.5 background discs.
-- [ ] MANIFEST+GMACS-like forecast: fibre-IFU bundles / multi-slit, R≈2–5k,
-      optical; survey-scale multiplex.
+      `notebooks/13_gmtifs_forecast.ipynb`, at a real site
+      (`kino.observing.GMT`, new -- see below -- sourced from GMTO's own
+      published Las Campanas coordinates). Building it found that
+      `forecast_ifu`/`forecast_slit` always convert a swept ground-based
+      seeing into the instrument's PSF, with no way to hold an AO-corrected
+      PSF fixed through a night -- a real, generalisable gap (also affects
+      `gemini_nifs.yaml`/`keck_osiris.yaml`), not fixed here to keep this a
+      case-study notebook rather than a forecast-machinery change. Also
+      found: the sky-spectrum library (1 µm) and CTIO extinction curve
+      (1087 nm) both end short of `gmtifs.yaml`'s own 1.10–1.14 µm window --
+      already-documented "optical only" scope, just the first thing to
+      actually hit it. Worked around by calling `shear_fisher` directly at
+      the config's own fixed fiducial AO PSF/sky rate instead of the
+      seeing/night-resolved convenience wrappers -- still real Cramer-Rao
+      forecast machinery, a real visibility window through a real GMT
+      night, and a real flux-scan of the statistical precision.
+- [x] MANIFEST+GMACS-like forecast: fibre-IFU bundles / multi-slit, R≈2–5k,
+      optical; survey-scale multiplex. `notebooks/14_manifest_gmacs_forecast.ipynb`.
+      Unlike GMTIFS, GMACS is seeing-limited (no AO) and its 0.50–0.52 µm
+      window is well inside the sky-spectrum library/extinction curve's real
+      coverage, so the full `forecast_slit` machinery (swept seeing, real
+      sky/extinction, through a real GMT night) applies cleanly for one
+      slitlet. "Survey-scale multiplex" itself is demonstrated as a synthetic
+      15-slitlet population forecast independently and combined (real finding
+      while building it: `kino.instruments.slit.SlitSpectrograph` models one
+      slit only, so this is *not* a real multi-object simulation -- no shared
+      detector, no overlapping traces, no fibre-positioner yield/collision
+      model; `gmacs.yaml`'s own header already states this scope limit) -- 7
+      of 15 detectable (stat S/N ≥ 3) at this flux/seeing, giving a stacked
+      survey-level σ_g1 = 0.0022 from a typical per-galaxy 0.0059.
 - [ ] Cluster-background proof-of-concept scenario (O(1) bright galaxies).
 - [x] Real-telescope IFU configs beyond SOAR, ahead of the public release:
       `kino/config/keck_kcwi.yaml` (Keck II KCWI), `kino/config/gemini_gmos_ifu.yaml`
