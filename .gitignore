@@ -30,3 +30,6 @@ dist/
 
 # status reports (LaTeX build products, internal progress notes) -- never committed
 /reports/
+
+# companion paper draft -- not tracked
+/paper/
