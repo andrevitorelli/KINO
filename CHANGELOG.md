@@ -3,10 +3,16 @@
 All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/) once
-`v0.1.0` is released.
+and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.1.0] - 2026-11-11
+
+First tagged release: the full forward model (galaxy, lensing, IFU and slit/grism instruments),
+inference (likelihoods, priors, nested-sampling), the observing-conditions and forecasting layer,
+mocks/IO, and the validation/case-study work described in the companion paper and README.md's
+phased roadmap.
 
 ### Added
 
@@ -533,4 +539,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/) once
   arXiv:2211.11790 -- not "2022") in report material and cross-checked
   against the docstrings/changelog entries that reference it.
 
-[Unreleased]: https://github.com/andrevitorelli/KINO/compare/main...HEAD
+[Unreleased]: https://github.com/andrevitorelli/KINO/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/andrevitorelli/KINO/releases/tag/v0.1.0

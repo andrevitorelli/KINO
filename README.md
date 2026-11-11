@@ -394,7 +394,7 @@ summary level.
       Goodman's real measured coverage.
 
 ### Phase 7 — Instrument case studies
-- [ ] Observing-conditions layer (`kino.observing`), so a target + night gives
+- [x] Observing-conditions layer (`kino.observing`), so a target + night gives
       S/N vs. seeing. Done: site (SOAR, coordinates from Mamajek 2013; GMT/Las
       Campanas added 2026-10-23 from GMTO's own site page, for the GMTIFS/GMACS
       forecasts below), the dark
@@ -541,7 +541,10 @@ summary level.
       than IFU per evaluation (~3.6s vs ~0.4s), so nested sampling there is
       correspondingly slower -- both documented as genuinely slow, not a
       quick CLI demo.
-- [ ] Versioned release (`v0.1.0`), Zenodo DOI, citation file.
+- [x] Versioned release (`v0.1.0`), citation file (`CITATION.cff`). Zenodo DOI
+      still pending: needs the GitHub repo connected to Zenodo and a GitHub
+      Release published from the `v0.1.0` tag, both one-time account actions
+      outside this repo.
 
 ---
 

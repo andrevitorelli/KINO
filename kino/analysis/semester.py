@@ -162,6 +162,8 @@ def forecast_over_nights(
         ``snr_threshold``, ``priors``, ``estimator``, ``intrinsic_sigma``,
         ``psf_error``).
 
+    Notes
+    -----
     A target/instrument mismatch that's independent of the date (the line
     outside the sky library's or the instrument's own wavelength coverage)
     raises on the very first night, exactly as ``forecast_ifu``/

@@ -20,3 +20,15 @@ products (`kino.io.fitsio`/`kino.io.hdf5`, README.md Phase 4).
 ::: kino.io.hdf5
     options:
       show_root_heading: true
+
+::: kino.io.kinms
+    options:
+      show_root_heading: true
+
+::: kino.io.manga
+    options:
+      show_root_heading: true
+
+::: kino.io.download
+    options:
+      show_root_heading: true

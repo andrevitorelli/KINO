@@ -20,3 +20,7 @@ for the forecast workflow.
 ::: kino.analysis.injection
     options:
       show_root_heading: true
+
+::: kino.analysis.semester
+    options:
+      show_root_heading: true

@@ -1,8 +1,10 @@
 # Forecasting a target
 
-This is the same workflow that produced the real forecast numbers in
-KINO's own SOAR 2027A proposal — going from a target's coordinates and
-line flux to a shear S/N forecast through a real night at a real site.
+This is the same workflow behind KINO's own real telescope-time proposals —
+going from a target's coordinates and line flux to a shear S/N forecast
+through a real night at a real site. The numbers below are a synthetic,
+illustrative target, not a real one (candidate target lists are private —
+see `CLAUDE.md`).
 
 ```python
 import numpy as np
@@ -13,20 +15,20 @@ from kino.instruments.ifu import IFU
 from kino.analysis.forecast import ForecastTarget, forecast_ifu
 from kino.observing import SOAR, night_window, SkyLibrary, solar_flux
 
-gal = DiscGalaxy(r_e=1.26, inc=55.0, pa=30.0, v_flat=180.0, z=0.4988, sigma0=40.0)
-coord = SkyCoord(ra=328.62827 * u.deg, dec=0.63725466 * u.deg)
+gal = DiscGalaxy(r_e=1.2, inc=55.0, pa=30.0, v_flat=180.0, z=0.45, sigma0=40.0)
+coord = SkyCoord(ra=150.0 * u.deg, dec=2.5 * u.deg)
 target = ForecastTarget(
-    coord, gal, 8.4e-16 * u.erg / u.s / u.cm**2, "OII3727", name="demo"
+    coord, gal, 1e-15 * u.erg / u.s / u.cm**2, "OII3727", name="demo"
 )
 
 ifu = IFU.from_config("kino/config/sifs.yaml")
 lib = SkyLibrary.load("data/skycalc")        # needs the `sky` extra's data, see Install
-night = night_window(SOAR, "2027-07-28")
-F107 = solar_flux("2027-07")[0]              # monthly-mean 10.7cm solar flux
+night = night_window(SOAR, "2027-06-15")
+F107 = solar_flux("2027-06")[0]              # monthly-mean 10.7cm solar flux
 
 forecast = forecast_ifu(
     ifu, target, night, lib,
-    g=(0.14, 0.0),
+    g=(0.03, -0.01),
     seeing_ref=[1.0] * u.arcsec,
     solar_flux=F107,
     time_step=60 * u.min,
@@ -74,12 +76,12 @@ dates = semester_dates("2027-05-01", "2027-11-30", step_days=7)  # weekly stride
 
 nightly = forecast_over_nights(
     ifu, target, dates, lib,
-    g=(0.14, 0.0), seeing_ref=[1.0] * u.arcsec, site=SOAR, time_step=180 * u.min,
+    g=(0.03, -0.01), seeing_ref=[1.0] * u.arcsec, site=SOAR, time_step=180 * u.min,
 )
 print(nightly.summary())   # the single best night across the whole range
 
 # several candidates (never commit a real target list -- see CLAUDE.md), ranked:
-ranked = rank_candidates(ifu, [target_a, target_b, target_c], dates, lib, g=(0.14, 0.0),
+ranked = rank_candidates(ifu, [target_a, target_b, target_c], dates, lib, g=(0.03, -0.01),
                           seeing_ref=[1.0] * u.arcsec, site=SOAR)
 ```
 

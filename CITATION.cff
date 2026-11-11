@@ -7,15 +7,15 @@ abstract: >-
   velocity field of an individual disc galaxy -- across both integral-field
   unit (IFU) and slit/grism spectrograph observing modes.
 authors:
-  - family-names: "Zvitorelli"
+  - family-names: "Zamorano Vitorelli"
     given-names: "Andre"
     email: "andrezvitorelli@gmail.com"
 repository-code: "https://github.com/andrevitorelli/KINO"
 license: MIT
-# version/date-released/doi/identifiers below are placeholders -- update them
-# (and add a `doi:`/`identifiers:` entry for the Zenodo DOI) when v0.1.0 is
-# actually tagged and released; see README.md Phase 8.
-version: 0.1.0.dev0
+# doi/identifiers below are placeholders -- add a `doi:`/`identifiers:` entry
+# for the Zenodo DOI once this release is archived there.
+version: 0.1.0
+date-released: "2026-11-11"
 keywords:
   - astronomy
   - weak gravitational lensing
